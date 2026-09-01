@@ -1,0 +1,11 @@
+{"ts": "2026-09-01T07:34:05.394+00:00", "provider": "deepseek", "model": "deepseek-v4-pro", "kind": "loop", "in": 1982, "out": 92}
+{"ts": "2026-09-01T07:38:31.715+00:00", "provider": "deepseek", "model": "deepseek-v4-pro", "kind": "loop", "in": 2054, "out": 88}
+{"ts": "2026-09-01T07:38:32.891+00:00", "provider": "deepseek", "model": "deepseek-v4-pro", "kind": "loop", "in": 2172, "out": 16}
+{"ts": "2026-09-01T07:40:20.973+00:00", "provider": "deepseek", "model": "deepseek-v4-pro", "kind": "loop", "in": 2140, "out": 167}
+{"ts": "2026-09-01T07:40:22.995+00:00", "provider": "deepseek", "model": "deepseek-v4-pro", "kind": "loop", "in": 2399, "out": 90}
+{"ts": "2026-09-01T07:43:25.235+00:00", "provider": "deepseek", "model": "deepseek-v4-pro", "kind": "loop", "in": 2371, "out": 169}
+{"ts": "2026-09-01T07:48:50.707+00:00", "provider": "deepseek", "model": "deepseek-v4-pro", "kind": "loop", "in": 2517, "out": 404}
+{"ts": "2026-09-01T07:49:15.541+00:00", "provider": "deepseek", "model": "deepseek-v4-pro", "kind": "loop", "in": 2899, "out": 156}
+{"ts": "2026-09-01T07:49:17.266+00:00", "provider": "deepseek", "model": "deepseek-v4-pro", "kind": "loop", "in": 3070, "out": 35}
+{"ts": "2026-09-01T07:50:27.942+00:00", "provider": "deepseek", "model": "deepseek-v4-pro", "kind": "loop", "in": 3035, "out": 105}
+{"ts": "2026-09-01T07:51:32.764+00:00", "provider": "deepseek", "model": "deepseek-v4-pro", "kind": "loop", "in": 3068, "out": 187}
