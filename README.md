@@ -256,3 +256,221 @@ Agent评测是一个涵盖执行追踪、质量评估与发布控制的完整闭
 此外，对于Agent内容生成类任务，还可将生成结果与预测结果进行比对，交由单一LLM或多LLM协同打分。
 评测完成后，所有维度的结果将汇总为评测报告，并进入多步骤门禁发布流程。门禁依次检查完成度是否达标、质量分是否超过阈值、新模型是否优于基线模型、Trace链路是否存在异常超时，最后经人工审批确认。
 任一环节未通过则驳回并反馈修复，全部通过后方可正式发布，形成“评测—门禁—迭代”的完整闭环。
+
+```mermaid
+flowchart TB
+    subgraph 评测输入
+        A[Agent 任务集<br/>Test Cases]
+        B[参考模型<br/>用于对比]
+    end
+
+    subgraph 评测执行
+        C[Agent 执行任务]
+        D[Trace 链路追踪<br/>全链路记录]
+    end
+
+    subgraph 评测维度
+        E[完成度评测<br/>0/1 断言]
+        F[质量评测<br/>LLM 裁判打分]
+        G[对比评测<br/>多模型对比]
+    end
+
+    subgraph 质量评测详细
+        H[Case定制 Criteria]
+        I[统一 RUBRIC]
+        J[多裁判打分<br/>降低偏差]
+    end
+
+    subgraph 门禁发布
+        K[多步骤门禁检查]
+        L[通过 ✅]
+        M[驳回 ❌]
+    end
+
+    A --> C
+    C --> D
+    D --> E
+    D --> F
+    D --> G
+    F --> H
+    F --> I
+    F --> J
+    E --> K
+    F --> K
+    G --> K
+    K --> L
+    K --> M
+```
+
+```mermaid
+flowchart LR
+    subgraph 输入
+        A[Agent 生成内容]
+        B[任务/问题]
+    end
+
+    subgraph 裁判配置
+        C{打分模式}
+        C -->|模式一| D[Case定制 Criteria<br/>每个Case独立标准]
+        C -->|模式二| E[统一 RUBRIC<br/>全局评分标准]
+    end
+
+    subgraph 多裁判打分
+        F[LLM 裁判 1]
+        G[LLM 裁判 2]
+        H[LLM 裁判 N]
+    end
+
+    subgraph 聚合
+        I[分数聚合<br/>平均/投票]
+        J[最终质量分]
+    end
+
+    A --> C
+    B --> C
+    D --> F
+    E --> F
+    D --> G
+    E --> G
+    D --> H
+    E --> H
+    F --> I
+    G --> I
+    H --> I
+    I --> J
+```
+
+```mermaid
+flowchart TB
+    subgraph 任务集
+        T[统一测试任务]
+    end
+
+    subgraph 模型池
+        M1[模型 A]
+        M2[模型 B]
+        M3[模型 C]
+    end
+
+    subgraph 执行
+        R1[结果 A]
+        R2[结果 B]
+        R3[结果 C]
+    end
+
+    subgraph 对比维度
+        C1[完成度对比<br/>0/1 断言]
+        C2[质量对比<br/>LLM 裁判打分]
+        C3[内容生成对比<br/>预测结果比对]
+    end
+
+    subgraph 输出
+        O1[排名/推荐]
+        O2[优劣势分析]
+    end
+
+    T --> M1 --> R1
+    T --> M2 --> R2
+    T --> M3 --> R3
+
+    R1 --> C1 --> O1
+    R2 --> C1
+    R3 --> C1
+
+    R1 --> C2 --> O2
+    R2 --> C2
+    R3 --> C2
+
+    R1 --> C3
+    R2 --> C3
+    R3 --> C3
+```
+
+```mermaid
+flowchart TB
+    subgraph Agent执行
+        S[用户输入]
+        A[Agent 推理]
+        T1[工具调用 1]
+        T2[工具调用 2]
+        O[最终输出]
+    end
+
+    subgraph Trace记录
+        L1[思考/决策]
+        L2[工具执行<br/>入参/出参]
+        L3[中间结果]
+        L4[耗时/Token]
+    end
+
+    subgraph Trace应用
+        D1[调试定位<br/>错误根因]
+        D2[性能分析<br/>瓶颈识别]
+        D3[评测辅助<br/>过程质量]
+        D4[可视化展示<br/>瀑布图]
+    end
+
+    S --> A --> T1 --> T2 --> O
+    A -.-> L1
+    T1 -.-> L2
+    T2 -.-> L2
+    O -.-> L3
+    L1 -.-> L4
+    L2 -.-> L4
+    L3 -.-> L4
+
+    L1 --> D1
+    L2 --> D2
+    L3 --> D3
+    L4 --> D2
+    D1 --> D4
+    D2 --> D4
+    D3 --> D4
+```
+
+```mermaid
+flowchart LR
+    subgraph 准备阶段
+        P1[测试用例集]
+        P2[基线模型]
+        P3[评分标准<br/>统一/定制]
+    end
+
+    subgraph 执行阶段
+        E1[Agent 执行]
+        E2[Trace 采集]
+        E3[多模型并行执行]
+    end
+
+    subgraph 评测阶段
+        E4[完成度评测<br/>0/1断言]
+        E5[质量评测<br/>多LLM裁判]
+        E6[对比评测<br/>多模型对比]
+    end
+
+    subgraph 决策阶段
+        E7[生成评测报告]
+        E8{门禁检查}
+        E9[发布 ✅]
+        E10[迭代优化 🔄]
+    end
+
+    P1 --> E1
+    P2 --> E3
+    P3 --> E5
+
+    E1 --> E2
+    E2 --> E4
+    E2 --> E5
+
+    E3 --> E6
+
+    E4 --> E7
+    E5 --> E7
+    E6 --> E7
+
+    E7 --> E8
+    E8 -->|通过| E9
+    E8 -->|不通过| E10
+    E10 --> P1
+```
