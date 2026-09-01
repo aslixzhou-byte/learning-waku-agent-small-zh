@@ -1,5 +1,4 @@
-"""waku-agent —— 一个极简、透明、本地优先的 Waku。
-
+"""waku-agent
 四大支柱，各对应一个模块：
   harness  → waku/runtime + waku/gateway  （围绕裸 LLM 的脚手架）
   loop     → waku/loop                      （观察 → 推理 → 行动 → 重复）

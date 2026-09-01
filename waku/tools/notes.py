@@ -1,18 +1,18 @@
-"""save_note —— 应请求把一条持久事实写入语义记忆。
-
+"""save_note 应请求把一条持久事实写入语义记忆。
 这是*显式*记忆路径（"记住 Alex 更喜欢上午"）。
 *隐式*路径是记忆整合（waku/memory/consolidation.py），
 它无需被请求，就从聊天历史中提炼出事实。
 """
 
-from __future__ import annotations  # 让类型注解在旧版 Python 里也能用
+from __future__ import annotations
 
-import sqlite3  # 写入语义记忆数据库
+import sqlite3
 
-from waku.tools.registry import Tool  # 工具定义类
+from waku.tools.registry import Tool
 
 
 def make_tool(conn: sqlite3.Connection) -> Tool:
+
     def save_note(subject: str, content: str) -> str:
         conn.execute(  # 插入一条事实；来源标 'user'（区别于记忆整合自动提炼的）
             "INSERT INTO facts (subject, content, source) VALUES (?,?,'user')",

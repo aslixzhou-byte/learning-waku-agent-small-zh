@@ -1,16 +1,6 @@
-"""路线图工具 —— 白板上旗舰任务之外的盒子。
+"""路线图工具
 
-其中一个现在已经可用：`delegate_task`（子代理盒子）把一个编码任务
-交给 pi（https://github.com/earendil-works/pi）——Mario Zechner 写的一个
-极简开源编码代理——通过它的无头打印模式（`pi -p "task"`）。
-分工是教学点：Waku 是编排者（记忆、工作记忆组装、评估、人的上下文），
-pi 是专业承包商（read/bash/edit/write，纯粹的编码手艺）。Waku 雇佣；pi 写码；
-然后 Waku 的发布门禁可以检查其成果。v2 想法：运行 `pi --mode json`，
-把它的每轮事件流式送到仪表板的循环选项卡。
-
-另外三个盒子有意保持为骨架：每个都展示某能力的*形状*并返回诚实的
-"coming soon"（终端/浏览器工具需要先有真正的沙箱 + 安全面）。
-这里的所有东西默认关闭；设置 `WAKU_EXPERIMENTAL=1` 才会注册这些工具。
+不做解释说明
 """
 
 from __future__ import annotations  # 让类型注解在旧版 Python 里也能用
@@ -24,9 +14,8 @@ from pathlib import Path       # 处理路径
 from waku.config import Settings     # 应用配置对象
 from waku.tools.registry import Tool # 工具定义类
 
-PI_INSTALL_HINT = "npm install -g --ignore-scripts @earendil-works/pi-coding-agent"  # pi 未安装时的安装提示
+PI_INSTALL_HINT = "npm install -g --ignore-scripts @earendil-works/pi-coding-agent"
 
-# 仍是骨架的盒子：name → 它将做什么，以及它在白板上的盒子。
 PLANNED = [
     {"name": "run_command", "box": "Terminal tool",
      # 提示词：在沙箱中运行 shell 命令并读取输出——Hermes 的 'Terminal' 工具。
@@ -48,7 +37,6 @@ PLANNED = [
 
 def make_delegate_tool(settings: Settings) -> Tool:
     """子代理盒子，真正接通：把一个编码任务委托给 pi。
-
     与每个 Waku 工具相同的诚实契约——返回字符串精确说明发生了什么
     （完成 / 失败 / 超时 / 未安装 pi），足够短，让语音网关能朗读。
     完整的 pi 转录会放进发件箱。

@@ -1,4 +1,4 @@
-"""确定性评估——程序性技能使用可移植的文本编码。"""
+"""确定性评估 程序性技能使用可移植的文本编码。"""
 
 from io import BytesIO
 from pathlib import Path

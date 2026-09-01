@@ -1,15 +1,13 @@
-"""代理的工具集。旗舰任务工具（日历/笔记/消息）、记忆自管理
-（manage_memory/update_soul/create_skill），以及可选适配器：
-苹果生态（WAKU_APPLE_TOOLS=1）与 MCP 服务器（.waku/mcp.json）。"""
+"""代理的工具集"""
 
-from __future__ import annotations  # 让类型注解（如 sqlite3.Connection）在旧版 Python 里也能用
+from __future__ import annotations
 
-import os        # 读取环境变量（WAKU_EXPERIMENTAL 等开关）
-import sqlite3   # 提供数据库连接类型，传给各 make_* 工厂
+import os
+import sqlite3
 
-from waku.config import Settings                              # 应用配置对象（home 目录、各开关）
-from waku.tools import calendar, memory_admin, messages, notes, search  # 各工具模块（包内导入）
-from waku.tools.registry import ToolRegistry                  # 工具注册表类
+from waku.config import Settings
+from waku.tools import calendar, memory_admin, messages, notes, search
+from waku.tools.registry import ToolRegistry
 
 
 def build_registry(conn: sqlite3.Connection, settings: Settings, memory=None) -> ToolRegistry:
@@ -19,18 +17,18 @@ def build_registry(conn: sqlite3.Connection, settings: Settings, memory=None) ->
     registry.register(calendar.make_list_tool(conn))   # 读侧："我的日历上有什么？"
     registry.register(notes.make_tool(conn))
     registry.register(messages.make_tool(settings.home))
-    # 网页搜索 —— 与 create_event 配对，用于多工具循环演示
+    # 网页搜索 与 create_event 配对，用于多工具循环演示
     #（"找出剩下的世界杯比赛并加到我的日历上"）。
     registry.register(search.make_tool())
 
-    # 记忆自管理 —— 代理可以纠正/遗忘记忆、学习规则、
+    # 记忆自管理 代理可以纠正/遗忘记忆、学习规则、
     # 并自己编写技能（感觉像个会学习的私人代理，而不是黑盒）。
     if memory is not None:  # 只有循环运行（携带 memory 对象）时才注册；CLI 直连调用则跳过
         registry.register(memory_admin.make_manage_memory_tool(memory))
         registry.register(memory_admin.make_update_soul_tool(settings))
         registry.register(memory_admin.make_create_skill_tool(settings, memory))
 
-    # 实验性工具 —— 默认关闭；通过 WAKU_EXPERIMENTAL=1 启用。
+    # 实验性工具 默认关闭；通过 WAKU_EXPERIMENTAL=1 启用。
     # delegate_task（通过 pi 的子代理）已可用；terminal/browser/cron 仍是
     # 骨架，会返回 "coming soon"。
     # 两处都可开启：settings.experimental 或环境变量 WAKU_EXPERIMENTAL。

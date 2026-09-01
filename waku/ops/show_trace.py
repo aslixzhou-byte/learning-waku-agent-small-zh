@@ -1,14 +1,12 @@
-"""`python -m waku.ops.show_trace` —— 把 JSONL 追踪当作终端时间线来读。
-
-直接传入一个追踪文件，或者省略它，显示 WAKU_HOME 里最近的追踪
-（默认是当前目录的 .waku/）。追踪记录逐条打印，所以长时运行的会话
-不需要整块放进内存。
+"""
+show trace json
 """
 
 from __future__ import annotations
 
 import argparse      # 命令行参数解析
 import json          # 解析追踪的每一行
+import sys           # 重配 stdout 编码（Windows GBK 控制台遇到 emoji 会崩）
 from pathlib import Path
 from typing import TextIO
 
@@ -102,10 +100,17 @@ def latest_trace(traces: Path) -> Path | None:
     if not traces.is_dir():                       # 追踪目录不存在
         return None
     files = (path for path in traces.glob("*.jsonl") if path.is_file())   # 只看文件，不看目录
+
     return max(files, key=lambda path: path.stat().st_mtime, default=None)  # 按修改时间取最新
 
 
 def main() -> None:
+    # Windows 控制台默认 GBK，trace 里的 emoji（👋 等）无法编码会导致 rich 崩溃；
+    # 强制 stdout 用 UTF-8。Windows Terminal / VS Code 终端是 UTF-8，能正常显示。
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
     parser = argparse.ArgumentParser(description="Render a Waku JSONL trace as a terminal timeline.")
     parser.add_argument("trace", nargs="?", type=Path, help="trace JSONL file (defaults to latest)")
     args = parser.parse_args()
@@ -115,7 +120,9 @@ def main() -> None:
         return
 
     traces = load_settings().home / "traces"      # 否则读默认 home 下的追踪目录
+    print(traces)
     path = latest_trace(traces)                   # 自动选最近的一个文件
+    print(path)
     if path is None:                              # 一个追踪都没有
         Console().print(f"[dim]No traces found in {traces}.[/dim]")
         return

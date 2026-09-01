@@ -1,6 +1,5 @@
-"""create_event —— 旗舰工具。"会议触发了吗？" 是关键的确定性评估：
+"""create_event "会议触发了吗？" 是关键的确定性评估：
 要么写入了正确的行，要么没有。
-
 事件落在哪里：
   总是        state.db（评估在此断言）+ calendar.ics（可导入的文件）
   可选        通过 AppleScript 同步到专用的 "Waku" 日历——
@@ -21,13 +20,13 @@ from pathlib import Path       # 处理日历 ICS 文件路径
 
 from waku.tools.registry import Tool  # 工具定义类
 
-APPLE_CALENDAR_NAME = "Waku"  # 同步用的目标日历名（首次使用会自动创建）
+APPLE_CALENDAR_NAME = "Waku" # 同步用的目标日历名（首次使用会自动创建）
 
 
 def _write_ics(home: Path, title: str, start: str, end: str, attendees: str) -> None:
     """追加一个最小的 VEVENT。像 2026-07-14T09:00 这样的 ISO 时间戳会变成
     ICS 的紧凑形式 20260714T090000。"""
-    ics_path = home / "calendar.ics"  # 可手动导入日历应用的 ICS 文件路径
+    ics_path = home / "calendar.ics" # 可手动导入日历应用的 ICS 文件路径
 
     def dt(s: str) -> str:
         # ICS 时间戳要去掉 - 和 :，16 位（缺秒）时补上 "00"。

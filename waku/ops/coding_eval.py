@@ -1,17 +1,5 @@
-"""跨模型编码评测——pi 作为固定的框架/运行时，下面换掉的是「大脑」。
-
-智能体电池（evals/dataset.jsonl）评判的是模型能否驱动 Waku 自己的工具。
-编码用例是另一回事：它把一个真实的编程任务交给 **pi**（也就是
-`delegate_task` 用的那个子智能体），但指向的是参赛者的模型，然后通过
-「运行」产出代码来评分——`verify` 命令的退出码就是裁决，SWE-bench 风格，
-而不是裁判的主观意见。
-
-pi 原生支持我们固定的每一个模型提供方，所以一个框架/运行时就能试听所有大脑：
-
-    pi --provider <p> --model <m> --api-key <k> -p "<task>"
-
-Waku 保持调度者的角色；pi 保持承包商角色——我们只是来比较承包商。
-编码用例放在 `evals/coding.jsonl`（与智能体数据集分开，避免误入工具调用层）。
+"""跨模型编码评测
+不做解释说明
 """
 
 from __future__ import annotations
@@ -27,7 +15,7 @@ from pathlib import Path
 
 from waku.loop.models import PROVIDERS   # 模型提供方注册表（用于查密钥环境变量）
 
-# 编码用例文件的位置：仓库根的 evals/coding.jsonl（与智能体电池分开存储）。
+# 编码用例文件的位置：仓库根的 evals/coding.jsonl
 _CODING = Path(__file__).resolve().parents[2] / "evals" / "coding.jsonl"
 
 # Waku 模型提供方 id -> pi 内置的模型提供方 id（见 `pi --list-models`）。
@@ -41,31 +29,28 @@ PI_PROVIDER = {
 
 def load_coding_cases() -> list[dict]:
     """按文件顺序返回全部编码用例；文件缺失时返回空列表。"""
-    if not _CODING.exists():                    # 仓库里没带数据集时，什么都不返回
+    if not _CODING.exists():
         return []
     return [json.loads(line) for line in _CODING.read_text().splitlines() if line.strip()]
     # 每一非空行就是一个用例 dict；跳过空行，避免 json.loads 崩溃
 
-
 def pi_available() -> bool:
-    return shutil.which("pi") is not None   # 检查 PATH 上是否存在 pi 可执行文件
-
+    return shutil.which("pi") is not None  # 检查 PATH 上是否存在 pi 可执行文件
 
 def coding_case_for_message(message: str, cases: list[dict] | None = None) -> dict | None:
-    """输入与该提示词匹配（去除首尾空白后的精确匹配）的编码用例，这样竞技场就知道要
+    """输入与该提示词匹配（去除首尾空白后的精确匹配）的编码用例，这样Compare就知道要
     预置哪些文件、并按它的 `verify` 来评分。对自由形式的编码提示词（如「写个贪吃蛇
-    并跑起来」）返回 None——pi 仍然会运行并流式输出，只是没有可用来评分的测试。"""
+    并跑起来」）返回 None，pi 仍然会运行并流式输出，只是没有可用来评分的测试。"""
     msg = (message or "").strip()               # 归一化输入；空消息按空串处理
     for c in (cases if cases is not None else load_coding_cases()):   # 没传列表就自己加载
         if (c.get("input") or "").strip() == msg:   # 与用例的 input 精确匹配（同样去空白）
             return c
     return None                                 # 没有匹配 = 自由形式提示词，无需预置文件
 
-
 def run_coding_stream(provider: str, model: str, task: str, files: dict | None,
                       verify: str | None, on_line, timeout: int = 300) -> tuple:
-    """与 run_coding_case 类似，但会把 pi 的 stdout 逐行流式传给 `on_line`——
-    这样竞技场可以实时展示终端在执行任务。返回 (passed, why, seconds)；当没有
+    """与 run_coding_case 类似，但会把 pi 的 stdout 逐行流式传给 `on_line`，
+    这样Compare可以实时展示终端在执行任务。返回 (passed, why, seconds)；当没有
     verify 时 `passed` 为 None（自由形式的提示词只是运行，没有可评分的东西）。"""
     pi_bin = shutil.which("pi")                 # 定位 pi；找不到就提前失败
     if not pi_bin:
@@ -132,7 +117,6 @@ def run_coding_case(provider: str, model: str, case: dict,
                     timeout: int = 300) -> tuple[bool, str, float]:
     """在 (provider, model) 上通过 pi 运行一个编码用例，然后按该用例的 `verify`
     命令评分。返回 (passed, why, seconds)。
-
     裁决依据是 `verify` 在 pi 工作的那个沙箱里运行的退出码——所以「passed」意味着
     代码确实做到了要求的事，无论模型是怎么做到的。这里不会信任 pi 的任何文字描述。"""
     pi_bin = shutil.which("pi")                 # 定位 pi；找不到就提前失败

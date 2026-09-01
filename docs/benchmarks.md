@@ -2,7 +2,7 @@
 
 Waku 如何比较模型、每个测试测什么、以及怎么读结果。这是**Eval / LLM-Ops** 支柱横着用了一次：不是随时间给同一个 agent 打分，而是让*同一个任务同时穿过多个大脑*，并给结果打分——不只是看账单小票。
 
-> **诚实的前提说明。** Compare 竞技场（dashboard `#compare`）和 `scripts/shootout.py` 测的都是*在同一个共享框架上实时完成任务*。它们**不**复现标准化榜单（SWE-bench、τ-bench、Terminal-Bench、GPQA）——那些需要各自的数据集和官方框架。每个模型的公开榜单数值在 [§6](#6-published-benchmarks-reference)。我们的基准测试组是**本地的、可复现的镜像**：在隔离沙箱里看每个模型做同样的真实助手任务，然后给「是否真的做成了」打分。
+> **诚实的前提说明。** Compare（dashboard `#compare`）和 `scripts/shootout.py` 测的都是*在同一个共享框架上实时完成任务*。它们**不**复现标准化榜单（SWE-bench、τ-bench、Terminal-Bench、GPQA）——那些需要各自的数据集和官方框架。每个模型的公开榜单数值在 [§6](#6-published-benchmarks-reference)。我们的基准测试组是**本地的、可复现的镜像**：在隔离沙箱里看每个模型做同样的真实助手任务，然后给「是否真的做成了」打分。
 
 ---
 
@@ -10,7 +10,7 @@ Waku 如何比较模型、每个测试测什么、以及怎么读结果。这是
 
 本文档兼作分镜清单。视频的主轴是**评测与打分**，不是「模型 X 最强」：重点在于*你怎么做决定*——诚实地、带着证据。你会在镜头前跑的测试清单是 [§3](#3-battery-sections)——即基准组，按组分好，可以一次拍一组。建议的主线：
 
-1. **朴素的记分板（铺垫）。** 展示竞技场用一条 prompt 跑 11 个模型。速度、token、成本。然后转折：*「这只能告诉我谁又便宜又快——不是谁真的把活干了。」*（正是这个缺口催生了整支视频。）
+1. **朴素的记分板（铺垫）。** 展示Compare用一条 prompt 跑 11 个模型。速度、token、成本。然后转折：*「这只能告诉我谁又便宜又快——不是谁真的把活干了。」*（正是这个缺口催生了整支视频。）
 2. **逐轴打分。** 介绍四个轴（[§1](#1-the-four-axes)）：速度、成本、**完成度**（工具是否真的触发 / 事件是否真的建了）、**质量**（K3 做中立裁判）。强调 Completion 是*确定性的*——没有玄学，就是把 τ-bench/SWE-bench 的思路在本地做了一遍。
 3. **硬案例（便宜的模型在这里翻车）。** 跑基准组 A 的四个硬案例（[§3.A](#a-agentic-tool-calling--the-assistants-real-job)）——过度积极、数量精确、完整度、状态感知。这是最值钱的片段：模型回答得很流利，*却仍然过不了检查清单*。
 4. **K3 当裁判。** K3 当众给全场模型的转录打分，包括它自己（[§5](#5-the-judge--k3-as-neutral-referee)）。由赞助商的模型来当裁判就是噱头——诚实地展示，不藏着。
@@ -32,7 +32,7 @@ Waku 如何比较模型、每个测试测什么、以及怎么读结果。这是
 | **完成度** | *它做成活了没有？* | 对工具调用 + 沙箱状态 vs 任务预期结果的确定性检查 | 免费 |
 | **质量** | *回答有多好？* | LLM-as-judge（K3 做中立裁判）给转录打 0–10 分 + 理由 | 每列 1 次 judge 调用 |
 
-竞技场想讲的故事：**把 Cost 对着 Completion/Quality 画出来。** 「Opus 比 gemini-flash 贵 20 倍——它完成任务的能力也好 20 倍吗？」两个完成度得分相同、成本却差 20 倍的模型，就是整支视频的全部要点。
+Compare想讲的故事：**把 Cost 对着 Completion/Quality 画出来。** 「Opus 比 gemini-flash 贵 20 倍——它完成任务的能力也好 20 倍吗？」两个完成度得分相同、成本却差 20 倍的模型，就是整支视频的全部要点。
 
 ---
 
@@ -42,7 +42,7 @@ Waku 如何比较模型、每个测试测什么、以及怎么读结果。这是
 
 - 确定性评测层（`evals/deterministic/`，pytest，0/1），
 - CLI 对战（`scripts/shootout.py`，跨模型表格），
-- 实时竞技场的 **Completion** 列。
+- 实时 Compare的 **Completion** 列。
 
 **Completion 字段**（除 `id` + `input` 外均可选）：
 
@@ -100,7 +100,7 @@ make shootout-coding RUNS="kimi:kimi-k3 anthropic:claude-opus-4-8"
 ```
 pi 原生支持我们锁定的每个 provider（anthropic、openai、google/gemini、**moonshotai/kimi**、xai/grok、zai/glm）——runner 把 Waku 的 provider id 映射到 pi 的，并用 `--api-key` 传入密钥，所以 K3 和全场在完全对等的前提下比赛。实时已验证：opus-4-8 和 kimi-k3 都解出了 `code-fizzbuzz`（以真实测试执行打分）。打分器在 [`waku/ops/coding_eval.py`](../waku/ops/coding_eval.py)。
 
-**实时竞技场里也一样——走 LOOP，而不是绕过它：** 打开 **"coding (pi)"** 开关然后比赛。这会为比赛注册 `delegate_task`，所以每张卡片都跑**完整框架**（门禁 → 记忆 → 工具），由模型*自行决定*调用 `delegate_task`，它会在**那张卡片自己的模型**上生成一个 pi 子 agent 来写并运行代码。它是自主的——loop 依次跑 model → delegate_task → model 收尾，不需要停下来等——而且卡片展示真实凭据：门禁徽章、`delegate_task` 工具芯片、token 和成本（loop 自己的；pi 的内部 token 不采集）。自由格式的 prompt（"build snake and run it"）也行，因为 pi 有 bash 工具，所以"run it"在委托的子 agent 内部完成。（推理模型在这里很慢——kimi-k3 当 loop 大脑 + pi 可能要几分钟；拍 2-3 个模型就行。）
+**实时 Compare里也一样——走 LOOP，而不是绕过它：** 打开 **"coding (pi)"** 开关然后比赛。这会为比赛注册 `delegate_task`，所以每张卡片都跑**完整框架**（门禁 → 记忆 → 工具），由模型*自行决定*调用 `delegate_task`，它会在**那张卡片自己的模型**上生成一个 pi 子 agent 来写并运行代码。它是自主的——loop 依次跑 model → delegate_task → model 收尾，不需要停下来等——而且卡片展示真实凭据：门禁徽章、`delegate_task` 工具芯片、token 和成本（loop 自己的；pi 的内部 token 不采集）。自由格式的 prompt（"build snake and run it"）也行，因为 pi 有 bash 工具，所以"run it"在委托的子 agent 内部完成。（推理模型在这里很慢——kimi-k3 当 loop 大脑 + pi 可能要几分钟；拍 2-3 个模型就行。）
 
 **代码落在哪 + 自动运行：** 零散编码任务不会消失在临时目录里——`delegate_task` 把它存到带日期、自解释的工作区（`./waku_workspace/<date>/<time>-<model>-<slug>/`，git-ignored），并附 `MANIFEST.md`（日期、模型、任务、文件、运行结果）、pi 写的文件、pi 转录和 `run.log`。pi 完成后，框架会**自动运行**入口脚本（无头、捕获输出、30s 超时），把结果回喂给 loop，所以模型能看到自己的代码是否真的跑起来。配置：`WAKU_WORKSPACE`（根目录）、`WAKU_DELEGATE_AUTORUN=0`（禁用）、`WAKU_AUTORUN_TIMEOUT`。见 [`waku/tools/workspace.py`](../waku/tools/workspace.py)。
 
@@ -135,7 +135,7 @@ pi 原生支持我们锁定的每个 provider（anthropic、openai、google/gemi
 
 ## 5. 裁判——可切换、中立的裁判员
 
-Quality 轴通过 [`waku/ops/judge.py`](../waku/ops/judge.py) 给每条回复打 0–10 分 + 一行理由。裁判可以**从竞技场切换**（"grade" 开关旁边的下拉框），默认是 **gpt-5.6-sol**。
+Quality 轴通过 [`waku/ops/judge.py`](../waku/ops/judge.py) 给每条回复打 0–10 分 + 一行理由。裁判可以**从Compare切换**（"grade" 开关旁边的下拉框），默认是 **gpt-5.6-sol**。
 
 **为什么不用 K3 当裁判：** 不能用 K3 来测 K3——让参赛者给自己打分没有可信度，而且（我们实测遇到过）K3 当时也在*比赛*，所以同时给每一列打分把它自己的端点打爆、429，导致大部分分数空白。裁判应该选一个**没在比赛**的模型。gpt-5.6-sol 是自然之选：一个强推理模型，在这里当*参赛者*很吃亏（它在 chat 端点上不能调工具），但当*裁判*很合适（打分纯属文本）。任何 provider 都行——Waku 的 OpenAI 兼容客户端给裁判和 anthropic 线协议相同的接口。
 
@@ -187,20 +187,20 @@ make eval-judge
 1. **程序化结果检查**——给*终态*打分，不是给文笔打分。SWE-bench（补丁能否应用、测试是否通过）、τ-bench（工具 agent 是否把数据库留在正确状态）、Terminal-Bench、BFCL（函数调用准确率）。客观、可复现、便宜。→ **我们的 Completion 轴。**
 2. **LLM-as-judge + Elo**——用于没有唯一正确答案的开放式质量。MT-Bench、Chatbot Arena。主观但可扩展。→ **我们的 Quality 轴。**
 
-**Waku 已有的：** case 格式（`dataset.jsonl`）、确定性打分、跨模型 CLI（`shootout.py`）、judge 框架，以及 Speed/Cost/Tokens 的实时竞技场。
+**Waku 已有的：** case 格式（`dataset.jsonl`）、确定性打分、跨模型 CLI（`shootout.py`）、judge 框架，以及 Speed/Cost/Tokens 的实时 Compare。
 
 **还欠着什么（本文档点名的缺口）：**
-- ~~Completion 列接入实时竞技场~~——**完成**：在已知基准 case 上跑一场，现在会实时给每一列打分（绿色 "solved" / 红色 "failed · why" 徽章 + 一个 "solved" 记分板列），经由 [`waku/ops/scoring.py`](../waku/ops/scoring.py) 里与 `shootout.py` 共享的同一个打分器。
-- ~~基准组 B（编码）+ 跨模型 pi~~——**完成，CLI *和*实时竞技场都行**：`make shootout-coding` 出表格；在竞技场里，"coding (pi)" 开关让每张卡片在自己的模型上走 pi、终端实时流式输出，以测试打分。
-- ~~竞技场里的 Quality 列（K3-as-judge）~~——**完成**："grade with K3" 开关给每条回复打 0-10 分（[`waku/ops/judge.py`](../waku/ops/judge.py)）；每列徽章 + 一个 "K3 grade" 记分板列。
+- ~~Completion 列接入实时 Compare~~——**完成**：在已知基准 case 上跑一场，现在会实时给每一列打分（绿色 "solved" / 红色 "failed · why" 徽章 + 一个 "solved" 记分板列），经由 [`waku/ops/scoring.py`](../waku/ops/scoring.py) 里与 `shootout.py` 共享的同一个打分器。
+- ~~基准组 B（编码）+ 跨模型 pi~~——**完成，CLI *和*实时 Compare都行**：`make shootout-coding` 出表格；在Compare里，"coding (pi)" 开关让每张卡片在自己的模型上走 pi、终端实时流式输出，以测试打分。
+- ~~Compare里的 Quality 列（K3-as-judge）~~——**完成**："grade with K3" 开关给每条回复打 0-10 分（[`waku/ops/judge.py`](../waku/ops/judge.py)）；每列徽章 + 一个 "K3 grade" 记分板列。
 - ~~成本 vs 质量可视化~~——**完成**：记分板以成本-vs-(quality|completion) 散点图打头——便宜又好 = 左上角。
-- 剩余：实时竞技场里的编码列；随着视频脚本定稿，再补更多基准 case。
+- 剩余：实时 Compare里的编码列；随着视频脚本定稿，再补更多基准 case。
 
 ---
 
 ## 9. Dry run——拍摄前完整预演一遍
 
-每个轴的完整彩排。把每条 prompt **逐字**复制进竞技场的消息框——竞技场按精确文本把它匹配到基准 case 并自动打分（打错一个字 → 它照常比赛但 Completion 显示 "—"）。
+每个轴的完整彩排。把每条 prompt **逐字**复制进Compare的消息框——Compare按精确文本把它匹配到基准 case 并自动打分（打错一个字 → 它照常比赛但 Completion 显示 "—"）。
 
 ### 准备
 1. `make dashboard` → 打开 `localhost:7777` → **Compare** 标签。

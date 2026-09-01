@@ -1,21 +1,19 @@
-"""苹果生态工具（macOS），让 Waku 能向你汇报真实的周日程——
-读取你实际的日历应用（包括邮件邀请的事件）和邮件，并可写入提醒事项/备忘录。
-通过 WAKU_APPLE_TOOLS=1 启用；首次使用会触发系统的"自动化"权限提示。
-所有 AppleScript 都带超时运行，并返回真实的错误文本，
-这样慢或未授权的调用绝不会卡住一轮对话。
+"""苹果生态工具
+
+不做解释说明
 """
 
-from __future__ import annotations  # 让类型注解（如 tuple[bool, str]）在旧版 Python 里也能用
+from __future__ import annotations
 
-import os         # 读取 WAKU_APPLE_CALENDARS 环境变量
-import subprocess # 运行 osascript 命令与苹果应用交互
-import sys        # 判断平台（sys.platform == 'darwin' 才是 macOS）
-import time       # 缓存过期判断需要当前时间戳
+import os
+import subprocess
+import sys
+import time
 
 from waku.tools.registry import Tool  # 工具定义类
 
-_TIMEOUT = 30  # osascript 单次调用的默认超时（秒）：防止权限弹窗/慢调用卡住循环
-_cache: dict[str, tuple[float, str]] = {}  # 缓存：key → (写入时刻, 结果文本)，键如 "cal:7"
+_TIMEOUT = 30
+_cache: dict[str, tuple[float, str]] = {}
 
 
 def _osa(script: str, timeout: int = _TIMEOUT) -> tuple[bool, str]:
@@ -23,7 +21,6 @@ def _osa(script: str, timeout: int = _TIMEOUT) -> tuple[bool, str]:
     if sys.platform != "darwin":  # 非 macOS 平台没有 osascript，直接判失败
         return False, "Apple tools are macOS-only."
     try:
-        # 运行 osascript；text=True 拿到字符串而不是字节
         r = subprocess.run(["osascript", "-e", script], capture_output=True, text=True, timeout=timeout)
     except subprocess.TimeoutExpired:  # 超时 = 通常系统正弹着权限对话框
         return False, "timed out — the app may be showing a permission dialog; approve it and retry."

@@ -1,6 +1,7 @@
-"""记忆整合 —— 把对话蒸馏成持久记忆，但只在必要时进行。
+"""记忆整合 把对话蒸馏成持久记忆，但只在必要时进行。
 
-白板上的菱形："只有新增了 N 次聊天后才整合"。每条消息都跑一次摘要器既浪费又嘈杂；
+只有新增了 N 次聊天后才整合
+每条消息都跑一次摘要器既浪费又嘈杂；
 把 N 次交互批量处理，才能让摘要器有足够的上下文去提取值得保留的事实。
 
 一个便宜的小模型读取未整合的聊天日志，产出：
@@ -43,6 +44,9 @@ def consolidate_if_due(
     episodes: SqliteEpisodeStore,  # 情景记忆存储：写入一句情景摘要
 ) -> int:
     """返回写入了多少条新事实（0 = 尚未到期，或没有值得保留的内容）。"""
+
+    print("满N轮交互做一次记忆整合: consolidation.consolidate_if_due")
+
     rows = conn.execute(  # 找出所有尚未整合过的日志行
         "SELECT id, role, content FROM chat_log WHERE consolidated = 0 ORDER BY id"
     ).fetchall()
@@ -61,10 +65,14 @@ def consolidate_if_due(
     except Exception:
         return 0  # 绝不丢失日志 —— 它保持未整合状态，留待下次处理
 
+    print("try 小模型 整理对话信息")
+
     for fact in distilled.get("facts", []):
         if fact.get("subject") and fact.get("content"):  # 跳过缺字段的脏事实
+            print("添加事实记忆 facts.add: ")
             facts.add(fact["subject"], fact["content"], source="consolidation")  # 来源标记为整合，便于追溯
     if distilled.get("episode"):  # 模型给了一句话摘要才写情景记忆
+        print("添加情景记忆 facts.add: ")
         episodes.add(distilled["episode"], happened_at=date.today().isoformat())  # 时间戳用今天
 
     conn.execute(  # 把这批日志标记为已整合，避免下次重复处理

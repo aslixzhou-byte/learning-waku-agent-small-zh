@@ -1,7 +1,6 @@
 """一个 SQLite 文件（state.db）装下 Waku 记住和做过的所有事。
-
 这对应白板上的 Hermes 方案：SQLite + FTS5，无需服务器。
-随时可自己打开：  sqlite3 .waku/state.db '.tables'
+随时可自己打开： sqlite3 .waku/state.db '.tables'
 """
 
 from __future__ import annotations  # 让类型注解在旧版 Python 里也能用
@@ -109,4 +108,5 @@ def connect(home: Path, check_same_thread: bool = True) -> sqlite3.Connection:
     conn.execute("PRAGMA busy_timeout=3000")  # 写锁冲突时最多等 3 秒，避免立刻报 locked
     conn.executescript(SCHEMA)  # 一次性执行全部建表语句（幂等，可重复跑）
     _migrate(conn)  # 给老库补上缺失的列
+    print("connect 数据库连接成功 return conn")
     return conn

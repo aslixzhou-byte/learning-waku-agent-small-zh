@@ -1,21 +1,17 @@
-"""把 .waku 重置为演示 / 录制所需的干净、精选状态。
-
+"""
+把 .waku 重置为演示 / 录制所需的干净、精选状态。
     python scripts/demo_seed.py                 # 干净状态，保留消费账本
-    python scripts/demo_seed.py --reset-spend   # 同时清空 usage.jsonl（钱/令牌）
+    python scripts/demo_seed.py --reset-spend   # 同时清空 usage.jsonl
 
 它做什么（你的旧状态会先备份，绝不会只是删除）：
   1. 把当前 .waku 移到 .waku.bak-<时间戳>
   2. 创建全新的 state.db + calendar.ics
-  3. 预置少量干净的记忆（几条事实 + 一条情景）和 ONE 个日历事件——
+  3. 预置少量干净的记忆（几条事实 + 一条情景）和 ONE 个日历事件
      Sergey 每周六下午 5 点的固定游泳
   4. 清空循环/工具追踪以及 Ops 评估历史，让 Loop、Tools 和 Ops 标签页
      从空白开始，在你输入时当着观看者实时填充
 
-金钱/令牌消费账本（usage.jsonl）被视为永久记录，默认保留——只有显式传入
---reset-spend 才会被清空。
-
-它写入的一切与应用写入的数据相同——之后打开 state.db 看起来就和真实使用
-一模一样，只是更整洁。
+usage.jsonl被视为永久记录，默认保留,只有显式传入 --reset-spend 才会被清空。
 """
 
 from __future__ import annotations
@@ -30,7 +26,7 @@ from waku.memory.episodic.store import SqliteEpisodeStore
 from waku.memory.semantic.store import SqliteFactStore
 from waku.tools.calendar import make_tool
 
-# 精选预置数据——干净、无重复。录制前可按需编辑。
+# 精选预置数据
 FACTS = [
     ("user", "The user runs the YouTube channel 'Sean's AI Stories' and films implementation "
              "walkthroughs. His X account is @ShenSeanChen. All of his Chinese social media "
@@ -70,9 +66,6 @@ def main(reset_spend: bool = False) -> None:
     settings.ensure_home()
     conn = connect(home)
 
-    # 原地清空数据库行——绝不删除 state.db。删除文件会让任何存活的网关
-    # （正在运行的 `make telegram`、dashboard、打开的 CLI）持有一条指向旧 inode
-    # 的已损坏、只读连接。
     for table in ("chat_log", "calendar_events", "facts", "episodes"):
         conn.execute(f"DELETE FROM {table}")   # 触发器让 FTS 索引保持同步
     conn.commit()
@@ -108,9 +101,7 @@ if __name__ == "__main__":
                         help="also wipe usage.jsonl (the money/token spend ledger)")
     args = parser.parse_args()
     if not args.yes:
-        # 安全门：这会销毁真实的记忆/日历/追踪。除非用户用 --yes 明确确认，
-        # 否则拒绝执行。参见 CLAUDE.md（“未经事先询问绝不清理运行时数据”）。
-        # 它会备份，但恢复很麻烦。
+        # 安全门：这会销毁真实的记忆/日历/追踪。除非用户用 --yes 明确确认，否则拒绝执行。
         print("REFUSING to run: demo_seed clears .waku (memory, calendar, chat, traces"
               + (", AND spend" if args.reset_spend else "") + ").")
         print("This is destructive. If you truly mean it, re-run with --yes:")

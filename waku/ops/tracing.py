@@ -1,11 +1,8 @@
-"""追踪——每次运行一条追踪（LLM-Ops 框，第一步）。
-
+"""追踪 每次运行一条追踪（LLM-Ops 框，第一步）。
 同一批事件的两个输出：
-
 1. JSONL，始终开启：每一轮对话都会把可读的行追加到
    .waku/traces/<date>.jsonl。追踪就是「按顺序发生了什么」——
    打开文件，读读你智能体的心思。零依赖。
-
 2. OpenTelemetry spans，当设置了 OTEL_EXPORTER_OTLP_ENDPOINT 时：同一批事件
    变成任意 OTel 后端都能渲染的 span 树。用于本地 dashboard：
 
@@ -19,13 +16,13 @@
 
 from __future__ import annotations
 
-import json                                    # 序列化追踪记录为 JSON 行
-from collections.abc import Iterator           # 迭代器类型注解
-from contextlib import contextmanager          # turn() 的上下文管理器装饰器
-from datetime import datetime, timezone        # 生成 UTC 时间戳
+import json
+from collections.abc import Iterator
+from contextlib import contextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 
-from waku.config import Settings               # 配置对象（提供 home / otel 端点）
+from waku.config import Settings
 
 
 def _now() -> str:
@@ -49,7 +46,7 @@ def iter_trace_lines(path: Path) -> Iterator[str]:
     """逐条产出 UTF-8 追踪行，遇到旧文件时给出有用的报错。"""
     try:
         with path.open("r", encoding="utf-8") as trace:
-            yield from trace                   # 逐行产出
+            yield from trace                   # 逐行产出 等价于 for line in trace: yield line
     except UnicodeDecodeError as exc:
         raise TraceEncodingError(path) from exc   # 把解码错误转成更友好的异常
 
@@ -138,6 +135,7 @@ class Tracer:
     @contextmanager
     def turn(self, user_message: str):
         self._write({"type": "turn_start", "user_message": user_message})   # 标记轮次开始
+        print("type=turn_start, user_message={}".format(user_message))
         if self._otel_tracer:
             with self._otel_tracer.start_as_current_span(
                 "agent_run",
@@ -152,6 +150,10 @@ class Tracer:
             yield self                          # 无 OTel 时纯 JSONL
 
     def end_turn(self, reply: str, iterations: int) -> None:
+
+        print("结束本轮追踪：tracer.end_turn")
+        print({"type": "turn_end", "reply": reply, "iterations": iterations})
+
         self._write({"type": "turn_end", "reply": reply, "iterations": iterations})  # 标记轮次结束
         if getattr(self, "_otel_provider", None):
             # 每轮都冲刷一次：即使进程被杀死，追踪也应该保留下来
@@ -165,3 +167,71 @@ def compose(*observers) -> callable:
         for obs in active:                      # 逐个转发给每个观察者
             obs(kind, event)
     return fanout
+
+# 测试compose使用
+if __name__ == "__main__":
+    from typing import Callable, Any, Dict
+    # 类型定义
+    LoopEvent = Dict[str, Any]
+    Observer = Callable[[str, LoopEvent], None]
+
+    # 模拟一个追踪器类
+    class Tracer:
+        def event(self, kind: str, ev: LoopEvent) -> None:
+            """记录事件到日志"""
+            print(f"  [追踪器] 记录事件: {kind} -> {ev}")
+
+    # 网关显示函数（观察者1）
+    def gateway_display(kind: str, ev: LoopEvent) -> None:
+        """在网关上显示事件"""
+        print(f"  [网关] 收到事件: {kind} -> {ev}")
+
+    # compose 函数 - 组合多个观察者
+    def compose(*observers: Observer) -> callable:
+        """把一个循环事件扇出给多个观察者（网关展示 + 追踪器）。"""
+        active = [o for o in observers if o]  # 过滤掉 None / 假值观察者
+        def fanout(kind: str, event: LoopEvent) -> None:
+            for obs in active:  # 逐个转发给每个观察者
+                obs(kind, event)
+        return fanout
+
+    # ============ 使用示例 ============
+    # 1. 准备外部捕获容器
+    captured = {}
+    # 2. 定义捕获函数（观察者3）
+    def _capture(kind: str, ev: LoopEvent) -> None:
+        """把 gate 事件捞进 captured"""
+        if kind == "gate":
+            captured["gate"] = {
+                "decision": ev.get("decision"),
+                "reason": ev.get("reason")
+            }
+            print(f"  [捕获器] 已捕获 gate 事件: {captured['gate']}")
+    # 3. 创建追踪器实例
+    tracer = Tracer()
+    # 4. 组合三个观察者成一条链
+    notify = compose(gateway_display, tracer.event, _capture)
+    # 5. 模拟循环执行，产生各种事件
+    def run_loop():
+        events = [
+            ("step", {"index": 1, "data": "处理中..."}),
+            ("gate", {"decision": "continue", "reason": "条件满足"}),
+            ("step", {"index": 2, "data": "继续处理..."}),
+            ("gate", {"decision": "stop", "reason": "循环结束"}),
+            ("step", {"index": 3, "data": "这行不会执行"}),
+        ]
+        print("开始循环事件处理:\n")
+        for kind, ev in events:
+            print(f"发送事件: {kind}")
+            notify(kind, ev)  # 所有观察者都会收到
+            # 检查是否需要停止
+            if kind == "gate" and captured.get("gate", {}).get("decision") == "stop":
+                print("\n[循环] 检测到 stop 信号，退出循环")
+                break
+            print()
+
+    # 执行
+    run_loop()
+    # 查看最终捕获的数据
+    print("\n最终的捕获数据:")
+    print(captured)

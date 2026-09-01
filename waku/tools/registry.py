@@ -1,8 +1,7 @@
-"""工具注册表 —— 白板上的 'Agentic Tools' 盒子。
-
+"""工具注册表
 一个工具由三部分组成：模型读取的名称+描述、参数用的 JSON schema、
-以及一个会被执行的 Python 函数。就这些。（注册表模式改编自
-launch-agentic-rag 的 app/agents/tools/registry.py。）
+以及一个会被执行的 Python 函数。
+（注册表模式改编自 launch-agentic-rag 的 app/agents/tools/registry.py。）
 """
 
 from __future__ import annotations  # 让类型注解（如 dict[str, Any]）在旧版 Python 里也能用

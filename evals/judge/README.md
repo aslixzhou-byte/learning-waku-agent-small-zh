@@ -2,7 +2,7 @@
 
 跑一轮 Waku，再用**同一套 provider**发一条打分 prompt，看回复够不够好（0–10，阈值 6）。
 
-和 `evals/deterministic/`（0/1）**不混用**。也别和 `waku/ops/judge.py`（Compare 竞技场裁判）搞混。
+和 `evals/deterministic/`（0/1）**不混用**。也别和 `waku/ops/judge.py`（Compare裁判）搞混。
 
 ## 怎么跑
 

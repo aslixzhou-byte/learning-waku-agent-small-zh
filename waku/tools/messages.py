@@ -1,8 +1,5 @@
-"""send_message —— 把一条消息草稿放进本地发件箱。
-
-本地优先：实际上什么都不会发送。每条消息变成 .waku/outbox/ 里的一个文件，
-你可以自己阅读、编辑并发送。接入真实渠道（邮件、Telegram、Slack）
-是一份很棒的社区贡献。
+"""send_message 把一条消息草稿放进本地发件箱。
+本地优先：实际上什么都不会发送。每条消息变成 .waku/outbox/ 里的一个文件
 """
 
 from __future__ import annotations  # 让类型注解在旧版 Python 里也能用

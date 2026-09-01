@@ -30,7 +30,7 @@ from pathlib import Path                  # 文件系统路径
 
 from waku.config import load_settings     # 读取 / 构建配置
 from waku.db import connect               # 打开 state.db
-from waku.ops import compare_history, judge as judge_mod, scoring   # 竞技场历史 / 裁判 / 完成度
+from waku.ops import compare_history, judge as judge_mod, scoring   # Compare历史 / 裁判 / 完成度
 from waku.ops.tracing import TraceEncodingError, iter_trace_lines   # 安全读取追踪文件
 
 PORT = 7777        # 默认端口；被占用时向上顺延
@@ -365,7 +365,7 @@ def compare_stream(message: str, specs: list, emit, judge: bool = False,
         with ThreadPoolExecutor(max_workers=2) as jex:
             list(jex.map(grade, list(collected)))
 
-    # 把这场对比持久化到竞技场自己的历史（绝不写智能体的真实状态）。
+    # 把这场对比持久化到Compare自己的历史（绝不写智能体的真实状态）。
     try:
         compare_history.append_run(load_settings().home, message, collected)
     except Exception:
@@ -374,7 +374,7 @@ def compare_stream(message: str, specs: list, emit, judge: bool = False,
 
 
 def compare_clear(payload: dict) -> dict:
-    """清空对比记分板/历史（Clear 按钮）。只动竞技场自己的日志；其它一概不碰。"""
+    """清空对比记分板/历史（Clear 按钮）。只动Compare自己的日志；其它一概不碰。"""
     compare_history.clear(load_settings().home)
     return {"ok": True, "runs": [], "aggregate": []}
 
@@ -1470,7 +1470,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):  # noqa: N802 — http.server 的 API
         if self.path == "/api/data":                     # 概览页主数据块
             self._send(json.dumps(collect(), default=str).encode(), "application/json")
-        elif self.path == "/api/compare/history":        # 竞技场历史 + 记分板
+        elif self.path == "/api/compare/history":        # Compare历史 + 记分板
             runs = compare_history.load_runs(load_settings().home)
             self._send(json.dumps(_compare_history_response(runs)).encode(), "application/json")
         elif self.path.startswith("/api/models"):        # 模型目录（可选 provider 查询参数）

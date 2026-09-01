@@ -1,5 +1,4 @@
-"""入口 —— 安装为 `waku` 命令（也支持 `python -m waku`）：
-
+"""入口
   waku                       在终端里对话（默认）
   waku dashboard             浏览器驾驶舱 → localhost:7777（若已配置则含 Telegram）
   waku voice                 用语音对话（需要 [voice] 额外依赖）

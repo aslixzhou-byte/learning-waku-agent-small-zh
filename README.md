@@ -1,267 +1,258 @@
-# waku-agent
+# waku-agent —— 个人理解版 中文参考
 
-**你自己的 AI 助手。跑在笔记本上。代码一个下午能读完。**
+> 本地优先的个人 Agent。下面是我读源码 + 动手实验后，对核心机制的理解整理。侧重「怎么测一个 Agent」这条主线。
 
-本地优先的个人助手，把严肃 Agent 的四大支柱摊开：**Harness · Loop · Memory · Eval/LLM-Ops**。没有框架把关键藏起来。
+四大支柱：**Harness · Loop · Memory · Eval/LLM-Ops**，没有框架把关键藏起来。
 
-| 支柱 | 要点 |
-|------|------|
-| Harness | 网关只传文本；工作记忆每轮现拼 |
-| Loop | ~95 行 Python：reason → act → observe |
-| Memory | 语义 / 情景 / 程序性；先问「要不要检索」，再批量巩固 |
-| Ops | JSONL trace + 确定性评测 + LLM-as-judge + 发布门禁 |
+---
+飞书参考文档: https://acnewhslidyx.feishu.cn/wiki/RRqZwqdxtiheYwkLnvLcZrO9nfb?from=from_copylink
+---
 
-对比 ChatGPT / Claude Desktop：那些是产品；这是可读蓝图。对比 OpenClaw / Hermes：同样架构，代码量约 1/100。
+## 致谢
+
+本代码是对 [waku-agent](https://github.com/shenseanchen/waku-agent) 源码的学习与二次整理。
+感谢原作者 [ShenSeanChen](https://github.com/shenseanchen) 开源项目。
+感谢 UP 主 [AI_Julie](https://github.com/juliepy/AI-Engineer-from-scrach) 的讲解与指引。
+
+## 我关注的核心主题
+
+| # | 主题 | 关键文件                                                         |
+|---|------|--------------------------------------------------------------|
+| 1 | Web 端测试 | `waku/gateway/fastapi_gateway.py`                            |
+| 2 | OpenAI ↔ Anthropic 输出格式转换 | `waku/loop/models.py`                                        |
+| 3 | Memory 记忆 | `waku/memory/`                                               |
+| 4 | Agent Trace 全链路追踪 | `waku/ops/tracing.py`                                        |
+| 5 | MCP 连接器与技能转换 | `waku/tools/mcp_client.py` · `memory/procedural/`            |
+| 6 | Agent 测评方式（重点） | `waku/ops/scoring.py` · `judge.py` · `evals/` · `demo_..py/` |
+| 7 | 发布门禁（多步骤兜底） | `waku/ops/release_gate.py`                                   |
 
 ---
 
-## 快速开始
+## 值得借鉴的设计决策
+- 检索之前的门禁（不是每轮都检索）：用小模型做裁判，回答「这条消息需要用到用户的记忆吗？」——省延迟，更重要的是避免无关记忆带偏答案。
+- 记忆整合是批量的（「每 N 轮之后」），与回复路径异步，且不会丢数据：如果摘要器失败，聊天日志保持未整合状态。
+- 确定性评测和 judge 评测永不混用。 一个是单元测试，另一个是带分数的观点。发布门禁要求前者 100% 通过、后者达到阈值。
+- 每一层都有朴素的默认实现和一个有文档的升级路径。 FTS5 → pgvector、mock 日历 → Google Calendar、JSONL → Phoenix/Langfuse。默认实现永远零注册即可用。
 
-**macOS / Linux / Git Bash：**
+## 1. Web 端测试 —— fastapi_gateway.py
 
-```bash
-git clone https://github.com/ShenSeanChen/waku-agent && cd waku-agent
-uv venv
-uv pip install -e .
-cp .env.example .env          # 设 WAKU_PROVIDER + 对应一把密钥
-uv run waku                   # 终端对话
-uv run waku dashboard         # 浏览器 → http://localhost:7777
+不用原始 dashboard.py，写一个最小可用的 FastAPI 网关，复刻 CLI 的「构建 Waku → 收消息 → 跑完整循环 → 返回回复」，只是 I/O 换成 HTTP。
+
+```text
+cli.py                    fastapi_gateway.py
+Waku()                    懒加载构建
+waku.respond(msg)         POST /chat → respond(msg, source="web")
+print(reply)              JSON 返回 {reply, tool_calls, iterations}
 ```
 
-**Windows PowerShell（分行执行，不要用 `&&`）：**
+- 非流式：一次跑完整轮再返回
+- 前端是内联的简单 HTML（输入框 + fetch）
+- 用于功能测试：发消息看 Waku 跑完整循环
 
 ```powershell
-git clone https://github.com/ShenSeanChen/waku-agent
-cd waku-agent
-uv venv
-uv pip install -e .
-Copy-Item .env.example .env   # 编辑 .env：WAKU_PROVIDER + 对应密钥
-uv run waku
-uv run waku dashboard         # 浏览器 → http://localhost:7777
+pip install fastapi uvicorn
+python -m waku.gateway.fastapi_gateway    # http://127.0.0.1:8000
 ```
 
-改完 `.env` 后重跑即可。本机若没有 `make`（常见于 Windows），一律用下面的 `uv run` / `python -m` 命令。
+![image\.png](图片和附件/image%2018.png)
 
-试一句：*"记住 Alex 更喜欢早上开会。"* 退出再进 → *"周五和 Alex 约个 catch-up。"* 记忆在 `.waku/state.db`。
+消息会话记忆为N轮次，可进行上下文压缩等改进
 
-| 命令 | 何时用 |
-|------|--------|
-| `uv run waku …` | 不用 activate（推荐） |
-| 激活 `.venv` 后 `waku …` | 长会话 |
-| `uv tool install .` 后 `waku …` | 全局安装 |
+改进：多用户session\_id隔离
+
+run\_loop的messages和chat\_log：前者为内存里的临时列表，后者磁盘数据库
+
+messages\.append修改临时列表让LLM在内循环看到assistant的思考（工具结果），跑完一轮后临时列表丢弃，不写入数据库，只有chat\_log入库user\-assistant一轮问答
+
+
+![image\.png](图片和附件/image%2013.png)
+
+![image\.png](图片和附件/image%2014.png)
+
+![image\.png](图片和附件/image%2016.png)
+
+![image\.png](图片和附件/image%204.png)
+
+![image\.png](图片和附件/image%2019.png)
+
+![image\.png](图片和附件/image%2017.png)
+
+![image\.png](图片和附件/image%206.png)
+
+![image\.png](图片和附件/image%208.png)
+
+![image\.png](图片和附件/image%202.png)
+
+![image\.png](图片和附件/image%2015.png)
+
+![image\.png](图片和附件/image.png)
+
+
 
 ---
 
-## 架构
+## 2. 精简 Dashboard —— dashboard-study.py
 
-详情与设计取舍见 [`docs/architecture.md`](docs/architecture.md)。可编辑白板在 [`docs/whiteboards/`](docs/whiteboards/)。
+原始 `dashboard.py` 有 1609 行（40 个函数 + HTTP Handler + main）。为了研究「多模型对比」这块逻辑，把 Compare 部分单独剥出来，只留 7 个函数 + 定价。
+
+| 保留 | 删掉 |
+|------|------|
+| `_compare_one` / `compare_models` / `compare_stream` | chat / collect / settings / 会话管理 |
+| `compare_clear` / `_compare_history_response` / `compare_regrade` / `compare_delete_run` | SQL console / 语音转写 / 模型目录 |
+| `price_for` + `PRICING` / `MODEL_PRICING` | `Handler` 类 + `main()`（HTTP 样板） |
+
+它是**纯业务逻辑函数库**（没有服务器、不能 `python -m` 跑），供研究 Compare 数据流或迁移 FastAPI 时参考。
+
+---
+
+## 3. OpenAI ↔ Anthropic 输出格式转换
+
+主循环只说一种「方言」：**Anthropic Messages 形状**。其他格式在边界翻译掉。
+
+```text
+主循环（内部）           Anthropic Messages 格式
+   │
+   ├─ anthropic 线 provider ── 直接返回 anthropic.Anthropic（零翻译）
+   └─ openai 线 provider ──── OpenAICompatClient 双向翻译
+```
+
+| 维度 | Anthropic Messages（内部） | OpenAI chat.completions（对外） |
+|------|---------------------------|--------------------------------|
+| system | 独立参数 `system` | `role="system"` 的消息 |
+| content | block 列表（text / tool_use / tool_result） | 字符串 / `tool_calls` 数组 |
+| 工具结果 | `tool_result` block | `role="tool"` 消息 |
+
+关键：`get_client()` 返回的东西，无论 provider 是谁，都有 `.messages.create()` / `.messages.stream()`，所以循环代码完全不用关心底层是哪家 API。
+
+---
+
+## 4. Memory 记忆
+
+三支柱 + 两道工序。一个 SQLite 文件（`.waku/state.db`）装下全部。
+
+| 层 | 作用 |
+|----|------|
+| Semantic（语义） | 持久事实，`facts` 表 + FTS5 |
+| Episodic（情景） | 带日期的事件，`episodes` 表 |
+| Procedural（程序性） | SKILL.md 怎么做（存文件，不进 db） |
+| Retrieval gate（检索门禁） | 每轮先问「这轮要不要检索记忆？」 |
+| Consolidation（记忆整合） | 每 N 轮把聊天蒸馏成事实 |
+
+核心：**工作记忆是滑动窗口（RAM），chat_log 是完整存档（磁盘）**。切换会话只动前者，后者全程在写。SOUL.md 每轮重读（人设），改了下一轮就生效。
+
+---
+
+## 5. Agent Trace 全链路追踪
+
+每轮对话把「按顺序发生了什么」追加成 JSONL，零依赖。
+
+```text
+.waku/traces/<date>.jsonl     ← 追踪轨迹（可重置）
+.waku/usage.jsonl             ← 花费台账（永不清除）
+
+turn_start → gate → llm → tool → llm → turn_end
+```
+
+- `Tracer` 兼作循环的观察者，每个事件盖时间戳写一行
+- 同一个事件流，设置了 OTel endpoint 就变成 span 树（Phoenix 瀑布）
+- 两个查看器：`python -m waku.ops.show_trace`（终端时间线）、`python -m waku.ops.trace_viewer`（浏览器瀑布）
+
+---
+
+## 6. MCP 连接器与技能转换
+
+- **MCP**：`.waku/mcp.json` 配置外部服务器，`mcp_client.py` 把它们的工具拉进同一个注册表（延迟导入，没配 MCP 零开销）
+- **技能（程序性记忆）**：SKILL.md 是「怎么做事」的指令，`loader.py` 用关键词重叠做透明触发，`create_skill` 工具让 Agent 自己写技能
+
+---
+
+## 7. Agent 测评方式（重点）
+
+**两类测评，永不混用。**
 
 ```mermaid
 flowchart TB
-  subgraph GW["1 Gateway - text only"]
-    CLI[CLI] --- TG[Telegram] --- VO[Voice] --- DASH[Dashboard]
-  end
-
-  WM["2 Working Memory<br/>SOUL.md / history / memory ctx"]
-
-  subgraph LOOP["3 Loop - reason then act then observe"]
-    LLM[LLM models.py] -->|tool call| TOOLS[Tools]
-    TOOLS -->|result| LLM
-  end
-
-  REPLY[4 Reply]
-
-  subgraph MEM["5 Memory - state.db"]
-    GATE{Retrieval gate} --> STORE[(semantic / episodic / procedural)]
-    STORE --> CONS[Consolidate]
-  end
-
-  subgraph OPS["6 Ops Eval"]
-    TRACE[Trace] --> EVAL[Deterministic + Judge]
-    EVAL --> RGATE[Release gate]
-  end
-
-  GW -->|message| WM
-  WM --> LLM
-  LLM -->|done| REPLY
-  REPLY --> GATE
-  REPLY --> TRACE
+  A[Agent 生成的结果] --> B{对比预测结果}
+  B -->|有标准答案| C[完成度 · 0/1 断言]
+  B -->|无标准答案| D[质量 · LLM 裁判打分]
+  C --> E[发布门禁兜底]
+  D --> E
 ```
 
-主链路：`Gateway → Working Memory → Loop → Reply → Memory / Eval`。  
-反馈（图中省略）：gate 命中时注入 WM；Ops 改进 prompt/config 后回灌 WM。
+### 7.1 完成度 —— 0/1 断言（不需要 LLM）
 
-| 模块 | 路径 |
-|------|------|
-| 装配入口 | [`waku/app.py`](waku/app.py) |
-| Gateway | [`waku/gateway/`](waku/gateway/) |
-| Working memory | [`waku/runtime/session.py`](waku/runtime/session.py) |
-| Loop | [`waku/loop/agent.py`](waku/loop/agent.py) · [`models.py`](waku/loop/models.py) |
-| Tools | [`waku/tools/`](waku/tools/) |
-| Memory + gate + consolidate | [`waku/memory/`](waku/memory/) |
-| Ops / dashboard | [`waku/ops/`](waku/ops/) |
-| Evals | [`evals/deterministic/`](evals/deterministic/) · [`evals/judge/`](evals/judge/) |
+「任务做成了没」：Agent 生成的动作 vs 预测结果（`expect_tool` / `expect_in_args` / `expect_min_tool_calls`）逐项对比。
 
----
-
-## Harness · Gateway
-
-网关只搬文本；同一大脑，多入口。
-
-| 入口 | 命令 | 依赖 |
-|------|------|------|
-| CLI | `uv run waku` | 默认 |
-| Dashboard | `uv run waku dashboard` | 默认 · `127.0.0.1:7777` |
-| Voice | `uv run waku voice` | `uv pip install -e ".[voice]"` |
-| Telegram | `uv run waku telegram` | `.[telegram]` + `TELEGRAM_BOT_TOKEN` |
-| Brief | `uv run waku brief` | macOS · `WAKU_APPLE_TOOLS=1` |
-
-**Dashboard** 是同一进程里的本地 Web UI（无构建）。标签对应支柱：Overview / Gateway / Loop / Memory / Tools / Data / Ops。聊天坞可打字或说话，看 harness 亮灯。
-
-**Voice：** 默认监听唤醒词 `waku waku`；`WAKU_WAKE_WORD=""` 改为按键说话。神经音色可选 `.[voice-neural]`（Kokoro）。
-
-**Telegram：** 长轮询，无需公网 URL；`TELEGRAM_ALLOWED_USER` 可锁本人。
-
-**Brief：** 读 Calendar.app + Mail + 记忆，写晨间简报（可挂系统 cron）。
-
----
-
-## Loop · Tools
-
-[`waku/loop/agent.py`](waku/loop/agent.py) —— 无 LangGraph：
-
-```text
-while not done:
-    response = llm(messages, tools)   # reason
-    if tool calls:
-        messages += run(tools)        # act → observe
-    else:
-        done                          # reply
+```json
+{"input": "Schedule a coffee with Alex...", "expect_tool": "create_event", "expect_in_args": {"title": "alex", "start": "T09:00"}}
 ```
 
-退出：模型不再要工具，或 `max_iterations`。Provider 用 `WAKU_PROVIDER`（anthropic / openai / gemini / deepseek / …）；适配在 [`loop/models.py`](waku/loop/models.py)。
+- **离线**：`ScriptedClient` 假模型回放，不花钱，测自己的代码
+- **live**：真实模型跑 `dataset.jsonl`，测模型+提示词行为
+- 判定就是 `scoring.check_case` 的 5 步硬规则
 
-| 试试 | 看什么 |
+### 7.2 质量 —— LLM 裁判打分（不需要标准答案）
+
+「回复好不好」：开放式问题没有唯一答案，所以**不需要预先知道答案**，只需要预先写一句**评分标准（criteria）**，让 LLM 照着打 0-10 分（阈值 6）。
+
+```python
+# 每个 case 定制 criteria prompt
+criteria = "uses the remembered fact that Alex prefers morning meetings"
+```
+
+关键区别：0/1 断言是「拿标准答案对答案」，LLM 裁判是「拿一把打分尺子量好坏」。
+
+### 7.3 多模型对比 —— 模型评测
+
+同一条任务，N 个模型各跑一遍（隔离沙箱 + 完整 agent 循环），并排对比四个维度：
+
+| 维度 | 怎么量 |
 |------|--------|
-| *"周六上午 8 点和 Raj 约网球"* | Loop · `create_event` · `iter 2` |
-| *"我今天日历上有什么？"* | `list_events`，不编造 |
-| *"搜索未打完的世界杯并加入日历"* | 多工具循环（需 `TAVILY_API_KEY` 更稳） |
-| CLI + 浏览器同时聊 | Gateway 打标 `cli` / `dashboard` |
-
-**记忆自管理工具：** `manage_memory` · `update_soul` · `create_skill`（也可在 Dashboard Memory / Settings 手改；密钥只写本地 `.env`）。
-
-**MCP：** `pip install -e '.[mcp]'`，配置 `.waku/mcp.json`。无 Node 演示：
-
-```bash
-cp examples/mcp.demo.json .waku/mcp.json   # PowerShell: Copy-Item ...
-uv run waku dashboard                      # Tools ▸ MCP 出现 demo_* 工具
-```
-
-**实验工具**（`WAKU_EXPERIMENTAL=1`）：`delegate_task` → [pi](https://github.com/earendil-works/pi) 已上线；`run_command` / `browse_web` / `schedule_task` 仍为骨架。
+| 速度 | `latency_ms` |
+| 成本 | token × 单价 `price_for` |
+| 完成度 | `check_case` 0/1 |
+| 质量 | 裁判 `judge_reply` 0-10 |
 
 ---
 
-## Memory
+## 8. 发布门禁 release_gate（多步骤兜底）
 
-三支柱 + 两道工序。可查询源在 `.waku/state.db`（FTS5）；每轮后镜像人类可读的 `.waku/MEMORY.md`。
-
-| 层 | 作用 | 路径 |
-|----|------|------|
-| Semantic | 持久事实 | `memory/semantic/` |
-| Episodic | 带日期情节 | `memory/episodic/` |
-| Procedural | SKILL.md 怎么做事 | `memory/procedural/` · [`skills/`](skills/) |
-| Retrieval gate | 这轮要不要记？ | `retrieval_gate.py` |
-| Consolidation | 每 N 轮蒸馏 | `consolidation.py` |
-
-```text
-you > what's 2+2?           → gate · skip
-you > when am I meeting Alex? → gate · retrieve
 ```
-
-安装 skill：
-
-```bash
-python -m waku skill install https://github.com/<org>/<repo>/blob/main/skills/<name>/SKILL.md
+第 1 步：deterministic 必须 100% 全绿（硬门，任一失败 → GATE CLOSED）
+第 2 步：有 key 才跑 judge，要过阈值 6（软门）
+全过 → GATE OPEN（退出码 0 = 可以发布）
 ```
-
-贡献：复制 [`skills/TEMPLATE.md`](skills/TEMPLATE.md) → PR 到 [`skills/community/`](skills/community/)。见 [CONTRIBUTING.md](CONTRIBUTING.md)。
-
----
-
-## Ops · Eval
-
-```mermaid
-flowchart LR
-  RUN[respond] --> TRACE[traces jsonl]
-  DET[deterministic 0/1] --> RG{release_gate}
-  JUD[judge score] --> RG
-  RG -->|pass| SHIP[ship]
-  RG -->|fail| BLOCK[block]
-```
-
-两类评测**永不混用**。线上 bug：修好并加一条 `evals/deterministic/` 回归。
-
-**先装评测依赖：**
-
-```bash
-uv pip install -e ".[eval]"
-```
-
-| 作用 | 推荐命令（全平台） | 有 `make` 时 |
-|------|-------------------|--------------|
-| 确定性 0/1（含 live） | `uv run python -m pytest -q evals/deterministic` | `make eval` |
-| 确定性仅离线 | `uv run python -m pytest -q evals/deterministic -m "not live"` | — |
-| LLM-as-judge | `uv run python -m pytest -q evals/judge` | `make eval-judge` |
-| 发布门禁 | `uv run python -m waku.ops.release_gate` | `make gate` |
-| Phoenix 瀑布 | `uv run python -m phoenix.server.main serve`（需 `.[tracing]`） | `make trace` |
-
-Windows PowerShell 示例：
 
 ```powershell
-uv pip install -e ".[eval]"
-uv run python -m pytest -q evals/deterministic -m "not live"   # 离线脚手架，应全绿
-uv run python -m pytest -q evals/deterministic                 # 含 live：测当前模型是否听话
-uv run python -m pytest -q evals/judge                         # 需 API key
-uv run python -m waku.ops.release_gate
+python -m waku.ops.release_gate    # 或 make gate
 ```
 
-- Trace：每轮追加 `.waku/traces/<date>.jsonl`（零配置）
-- 花费：追加 `.waku/usage.jsonl`（演示重置也保留）
-- 结果：终端 + Dashboard **Ops**
+结果写 `.waku/eval_report.json`（最新）+ `.waku/eval_runs.jsonl`（历史），Dashboard Ops 页读它。
 
-干净演示（会重置 `.waku`，每次须确认）：
+---
 
-```bash
-uv run python scripts/demo_seed.py --yes
+## 9. 我的实操 Demo
+
+| Demo | 演示什么 |
+|------|----------|
+| `demo_live_eval.py` | 0/1 断言：真实模型跑 dataset，看工具调对没 |
+| `demo_judge_eval.py` | LLM 打分（evals 版）：自定义 criteria |
+| `demo_judge_eval_2.py` | LLM 打分（ops/judge.py 版）：固定 RUBRIC + tools |
+| `demo_compare_eval.py` | 多模型对比：同题竞技，四维打分 |
+| `demo_judge_eval.py --all` | 跑全部 judge case |
+
+```powershell
+python demo_live_eval.py            # 0/1 断言
+python demo_judge_eval.py           # 质量打分
+python demo_compare_eval.py         # 多模型对比
 ```
 
 ---
 
-## 命令速查
-
-| 命令 | 作用 |
-|------|------|
-| `uv run waku` | 终端聊天 |
-| `uv run waku dashboard` | 驾驶舱 :7777 |
-| `uv run waku voice` | 语音 |
-| `uv run waku telegram` | 手机 → 笔记本 |
-| `uv run waku brief` | 晨间简报 |
-| `uv run python -m pytest -q evals/deterministic` | 确定性评测 |
-| `uv run python -m pytest -q evals/judge` | LLM judge |
-| `uv run python -m waku.ops.release_gate` | 发布门禁 |
-| `uv run python -m phoenix.server.main serve` | Phoenix :6006 |
-| `uv run ruff check waku evals` | lint |
-
-有 Make 的环境可用 `make eval` / `gate` / `trace` 等别名（见 `Makefile`）；Windows 通常没有 `make`，直接用上表。
-
----
-
-## 升级路径
-
-| 默认 | 升级 |
-|------|------|
-| SQLite FTS5 | `WAKU_SEMANTIC_STORE=supabase` + [`sql/init_supabase.sql`](sql/init_supabase.sql) |
-| Mock 日历（ICS） | `WAKU_APPLE_CALENDAR=1`，或换 `calendar.py`（schema 不变） |
-| 手写记忆支柱 | mem0 / Letta / Zep 等生产框架 |
-
-更多：[`docs/`](docs/) · [`learn_guide.md`](learn_guide.md) · [`CLAUDE.md`](CLAUDE.md)
+Agent评测是一个涵盖执行追踪、质量评估与发布控制的完整闭环体系。
+评测流程首先从测试任务集出发，驱动Agent执行特定任务，同时全程采集Trace链路追踪数据，记录Agent的每一次推理、工具调用、中间结果及耗时Token消耗，为后续问题定位与性能分析提供依据。
+在质量评估层面，评测体系采用多维度的打分机制。完成度评测采用0/1断言方式，判定Agent是否成功完成任务目标。质量评测则引入LLM作为裁判进行打分，该方式无需标准答案，可支持多裁判并行打分以降低单一模型偏差。
+质量评测支持两种评分模式：一是为每个测试用例定制独立的评分标准（Case定制Criteria），二是采用统一的评分量规（统一RUBRIC）对所有任务进行一致性评估。对比评测维度支持多个模型在相同任务集上的横向对比，并可额外引入LLM质量打分，综合评估不同模型的优劣。
+此外，对于Agent内容生成类任务，还可将生成结果与预测结果进行比对，交由单一LLM或多LLM协同打分。
+评测完成后，所有维度的结果将汇总为评测报告，并进入多步骤门禁发布流程。门禁依次检查完成度是否达标、质量分是否超过阈值、新模型是否优于基线模型、Trace链路是否存在异常超时，最后经人工审批确认。
+任一环节未通过则驳回并反馈修复，全部通过后方可正式发布，形成“评测—门禁—迭代”的完整闭环。

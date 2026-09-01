@@ -1,5 +1,5 @@
-"""校验仓库中的每一个 SKILL.md——由 CI 在社区 PR 上运行。
-
+"""
+校验仓库中的每一个 SKILL.md。
 检查官方 Agent Skills 的 frontmatter（name + description）、名称唯一性，以及
 一个软性的正文长度预算。任一失败都以退出码 1 结束。
 """
@@ -49,3 +49,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+    """skill validation OK — 2 skill(s): schedule-meeting, weekly-brief"""

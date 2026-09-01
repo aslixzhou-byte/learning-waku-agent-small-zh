@@ -1,6 +1,6 @@
 """评测电池的确定性「完成度」评分——唯一的评分器。
 
-`scripts/shootout.py`（CLI 表格）和对比竞技场（实时 dashboard 记分板）
+`scripts/shootout.py`（CLI 表格）和Compare（实时 dashboard 记分板）
 用同一种方式给模型的运行打分：预期的工具有没有触发、参数对不对、循环是否
 真正跑够了。把这个判定放在这里，终端数字和屏幕数字就永远不会分叉。
 
@@ -46,9 +46,9 @@ def check_case(case: dict, tool_calls: list[dict]) -> tuple[bool, str]:
 
 
 def case_for_message(message: str, cases: list[dict] | None = None) -> dict | None:
-    """输入与该竞技场提示词匹配（去除首尾空白后的精确匹配）的电池用例，
+    """输入与该Compare提示词匹配（去除首尾空白后的精确匹配）的电池用例，
     这样跑在「已知任务」上的对比就能拿到完成度分数。对自由形式的提示词返回
-    None——竞技场仍会展示速度/成本/token，只是没有分数。"""
+    None——Compare仍会展示速度/成本/token，只是没有分数。"""
     msg = (message or "").strip()        # 归一化输入
     for case in (cases if cases is not None else load_cases()):   # 没传列表就用默认数据集
         if (case.get("input") or "").strip() == msg:   # 与用例的 input 精确匹配

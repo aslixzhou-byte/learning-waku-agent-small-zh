@@ -1,21 +1,6 @@
 """一个带日期、自文档化的委托编码工作区。
 
-pi（通过 delegate_task）会写入真实的文件。如果没有归属地，它们会
-在临时目录里消失——所以每次临时委托都会落到
-
-    <WAKU_WORKSPACE>/<YYYY-MM-DD>/<HHMMSS>-<model>-<slug>/
-        <pi 写出的文件>
-        MANIFEST.md      日期、模型、任务、创建的文件、自动运行结果
-        run.log          自动运行的 stdout/退出码
-        pi-transcript.log
-
-这样一次编码运行是可追踪的，而不是神秘的临时目录。代码产物是
-交付物，而不是代理状态（记忆 / 日历 / 数据库），所以它刻意放在
-.waku 之外并加入 gitignore——它绝不会污染代理的真实状态或仓库。
-
-自动运行：pi 结束后，入口脚本会被运行（无头、捕获输出、带超时），
-结果会写入清单并回传给循环——这样模型能亲眼看到自己的代码是否
-真的运行了，并能作出反应。
+不做解释说明
 """
 
 from __future__ import annotations  # 让类型注解（tuple | None）在旧版 Python 里也能用
@@ -28,11 +13,11 @@ import time       # 测量自动运行耗时
 from datetime import datetime  # 生成带日期/时间的文件夹名
 from pathlib import Path       # 路径类型
 
-WORKSPACE_ENV = "WAKU_WORKSPACE"          # 根目录；默认 ./waku_workspace
-AUTORUN_ENV = "WAKU_DELEGATE_AUTORUN"     # 设为 "0"/"false"/"no" 可禁用自动运行
-RUN_TIMEOUT = int(os.getenv("WAKU_AUTORUN_TIMEOUT", "30"))  # 自动运行的超时秒数（默认 30）
-_OURS = {"MANIFEST.md", "run.log", "pi-transcript.log"}  # 我们自己的文件，不算作 pi 产物
-_ENTRY_PREFS = ("main.py", "app.py", "run.py", "game.py")  # 入口脚本候选名，按优先级
+WORKSPACE_ENV = "WAKU_WORKSPACE"
+AUTORUN_ENV = "WAKU_DELEGATE_AUTORUN"
+RUN_TIMEOUT = int(os.getenv("WAKU_AUTORUN_TIMEOUT", "30"))
+_OURS = {"MANIFEST.md", "run.log", "pi-transcript.log"}
+_ENTRY_PREFS = ("main.py", "app.py", "run.py", "game.py")
 
 
 def workspace_root() -> Path:

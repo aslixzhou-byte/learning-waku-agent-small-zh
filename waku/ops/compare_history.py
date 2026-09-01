@@ -1,10 +1,10 @@
-"""对比竞技场历史——基准测试自己专属的追加日志。
+"""Compare历史——基准测试自己专属的追加日志。
 
 刻意与智能体的真实状态（state.db / MEMORY.md / traces / usage.jsonl）分离。
 一次对比运行就是一次基准测试：一个提示词在一次性沙箱里跑过 N 个模型。
 它既不是一段对话、一条记忆，也不是单模型的追踪，所以绝不能落入
 chat_log / facts / calendar（那会污染循环/记忆/数据库/运维各视图，并破坏
-竞技场赖以工作的沙箱隔离）。
+Compare赖以工作的沙箱隔离）。
 
 因此它住进自己的 JSONL——每场对比一行——与仓库里其它追加日志
 （usage.jsonl、traces/*.jsonl、eval_runs.jsonl）保持一致。以读为主；
@@ -31,7 +31,7 @@ def _path(home: Path) -> Path:
 
 def _slim(r: dict) -> dict:
     """只保留历史列表 + 记分板需要的字段，并给回复加上限长。
-    接受竞技场产出的每个模型的结果 dict（gate 是 {decision, reason} 对象、
+    接受Compare产出的每个模型的结果 dict（gate 是 {decision, reason} 对象、
     tools 是 [{tool}]）并把它展平。"""
     gate = r.get("gate") or {}            # gate 可能是 dict 或 None；统一成 dict
     return {
@@ -55,7 +55,7 @@ def _slim(r: dict) -> dict:
 def append_run(home: Path, message: str, results: list[dict], ts: str | None = None) -> None:
     """追加一场已完成的对比，并裁剪到最近的 MAX_RUNS 场。
 
-    `results` 是竞技场已经构建好的每个模型的结果 dict 列表。
+    `results` 是Compare已经构建好的每个模型的结果 dict 列表。
     重写整个（受限长的）文件——因为构造上它很小，所以没问题。"""
     record = {
         "ts": ts or datetime.now(timezone.utc).isoformat(timespec="seconds"),  # 默认用当前 UTC 时间
@@ -77,7 +77,7 @@ def save_runs(home: Path, runs: list[dict]) -> None:
 
 
 def clear(home: Path) -> None:
-    """清空对比历史（记分板上的 Clear 按钮）。只移除竞技场自己的日志——其它一概不动。"""
+    """清空对比历史（记分板上的 Clear 按钮）。只移除Compare自己的日志——其它一概不动。"""
     _path(home).unlink(missing_ok=True)   # 删除文件；不存在也不报错
 
 

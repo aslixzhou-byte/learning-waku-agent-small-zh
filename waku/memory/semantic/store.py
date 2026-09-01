@@ -1,9 +1,7 @@
-"""语义记忆 —— 持久事实，用 SQLite FTS5 做关键词检索。
-
-白板上来自 Hermes 的洞见："关键词 top-k，不要 embedding"。对单个用户的事实来说，
-带排名的关键词检索（BM25）快速、完全本地化，而且 —— 对教学尤为关键 ——
-你可以用 sqlite3 直接读取整个索引。想要向量？设置 WAKU_SEMANTIC_STORE=supabase
-（见 supabase_store.py）。
+"""语义记忆 持久事实，用 SQLite FTS5 做关键词检索。
+关键词 top-k，不要 embedding
+对单个用户的事实来说，
+带排名的关键词检索（BM25）快速、完全本地化，而且对教学尤为关键
 """
 
 from __future__ import annotations  # 让类型注解（如 sqlite3.Connection）在旧版 Python 里也能用
@@ -29,9 +27,13 @@ class SqliteFactStore:
             "INSERT INTO facts (subject, content, source) VALUES (?,?,?)",
             (subject.lower().strip(), content, source),  # 主题归一化：转小写并去掉首尾空格，便于后续精确匹配
         )
+        print("插入事实摘要: subject={}, content={}, source={}".format(subject, content, source))
+
         self.conn.commit()  # 立即落库（facts_au 触发器会同步更新 FTS 索引）
 
     def search(self, query: str, top_k: int = 4) -> list[str]:
+        print("SqliteFactStore.search 查询语义记忆 top_k=4 query=".format(query))
+
         fts = _fts_query(query)  # 先把用户文本转成合法 FTS5 查询
         if not fts:
             return []  # 空查询直接返回空，不触发 MATCH 报错

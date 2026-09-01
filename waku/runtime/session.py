@@ -1,16 +1,17 @@
-"""短暂的一次 Agent 运行 —— 为每一轮组装工作记忆。
+"""短暂的一次 Agent 运行 为每一轮组装工作记忆。
 
-白板上的内层盒子：这里的一切每次运行都重建并丢弃。持久化的东西在 waku/memory。工作记忆 =
-
+白板上的内层盒子：这里的一切每次运行都重建并丢弃。持久化的东西在 waku/memory。
+工作记忆 =
     system prompt (SOUL.md)            ← Waku 是谁（人设）
   + durable facts & episodes           ← Waku 记得什么（经门禁把关！）
   + current chat history               ← 本次对话
   + the user's new message
+
 """
 
-from __future__ import annotations  # 让类型注解在旧版 Python 里也能用
+from __future__ import annotations
 
-from waku.config import Settings  # 配置：决定 home 路径、历史窗口等
+from waku.config import Settings
 
 # 默认人设（系统提示词）。以下逐段给出中文对照说明 —— 提示词本身保持英文，
 # 因为它是直接发给 LLM 的，改成中文会改变模型行为。
@@ -28,6 +29,7 @@ from waku.config import Settings  # 配置：决定 home 路径、历史窗口�
 #             绝不要声称同步到了工具输出没提到的任何地方。
 #   第 9 段：你能管理自己的记忆：用 manage_memory 纠正或遗忘事实，用 update_soul 保存
 #             用户给你的长期偏好，用 create_skill 保存用户教你的可复用流程（仅在对方同意后）。
+
 DEFAULT_SOUL = """\
 You are Waku, a personal assistant running locally on your user's laptop.
 You are concise, warm, and proactive. You remember what your user tells you.
@@ -59,7 +61,7 @@ Rules:
 def load_soul(settings: Settings) -> str:
     """SOUL.md 是可编辑的人设文件，首次运行时创建。改它就等于改你的 Waku 是谁
     —— 这就是最朴素的程序性记忆。"""
-    soul_path = settings.home / "SOUL.md"  # 人设文件固定叫 SOUL.md，放在 home 目录下
+    soul_path = settings.home / "SOUL.md" # 人设文件固定叫 SOUL.md，放在 home 目录下
     if not soul_path.exists():
         soul_path.write_text(DEFAULT_SOUL)  # 第一次跑：用内置模板建出可编辑的人设文件
     return soul_path.read_text()  # 每次运行都重读，保证改 SOUL.md 立即生效
@@ -67,7 +69,6 @@ def load_soul(settings: Settings) -> str:
 
 class Session:
     """承载一段对话：聊天历史 + 系统提示词的组装配方。每个网关连接一个 Session。"""
-
     def __init__(self, settings: Settings, memory=None, session_id: str = "default"):
         self.settings = settings  # 配置（home、history_turns 等）
         self.memory = memory  # waku.memory.Memory（Phase-2 接线前为 None）
@@ -100,13 +101,15 @@ class Session:
             if skills:
                 parts.append("\nRelevant skill instructions:\n" + skills)  # 技能指令拼进提示词
 
+        p = "\n".join(parts)
+        print("system prompt = {}".format(p))
+
         return "\n".join(parts)  # 各段用空行隔开，合成最终系统提示词
 
     def add_exchange(self, user_message: str, reply: str, tool_calls: list | None = None,
                      source: str = "cli", meta: dict | None = None) -> None:
         """把这一轮记录进历史（工作记忆），如果已接入记忆，也写进聊天日志
         （这样整合才能稍后提炼它）。
-
         工具活动会被折叠成 assistant 历史条目里的一行紧凑的 [tools used: ...]。
         没有它，模型会忘记自己已经行动过，下轮又开心地重跑同一个工具
         （就是首次实测里「同一会议被约三次」的 bug）。"""
@@ -114,9 +117,17 @@ class Session:
         if tool_calls:  # 这一轮动过工具：把工具活动折叠进回复
             summary = "; ".join(f"{c['tool']}({c['args']}) -> {c['output']}" for c in tool_calls)  # 每条调用一行「工具(参数) -> 结果」
             record = f"{reply}\n[tools used: {summary}]"  # 拼成一行紧凑记录，防模型下轮重跑同工具
+
+        print("将本轮对话信息加入工作记忆 session.history.append 最大10轮")
         self.history.append({"role": "user", "content": user_message})  # 用户消息进工作记忆
         self.history.append({"role": "assistant", "content": record})   # 助手回复（含工具摘要）进工作记忆
+
+        import json
+        print("当前会话内容：")
+        print(f"[HISTORY]\n{json.dumps(self.history, ensure_ascii=False, indent=2)}")
+
         if self.memory is not None:
+            print("本轮 run loop 结束 持久化聊天日志：memory.log_chat")
             self.memory.log_chat(user_message, record, session_id=self.session_id,  # 持久化到聊天日志，供整合提炼
                                  source=source, meta=meta)
 

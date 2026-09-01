@@ -1,14 +1,4 @@
-"""search_web —— 第二个真正的工具，也是一个绝佳的循环演示。
-
-"找出剩下的世界杯比赛并放到我的日历上"会让代理在多个工具间循环：
-search_web（读取网页）→ 推理结果 → 每个匹配项创建一个事件。
-在仪表板上观察循环盒子的运转。
-
-零新增依赖——只用标准库 urllib。两个后端：
-  默认    DuckDuckGo HTML（无需密钥，无需配置——足以演示）
-  更佳    Tavily，如果设置了 TAVILY_API_KEY（或 WAKU_SEARCH_API_KEY）——
-          一个对代理友好的搜索 API，结果更干净（免费额度）
-
+"""search_web 工具
 该工具返回模型可读取的纯文本；它绝不为模型解析 HTML。
 """
 
@@ -24,7 +14,6 @@ import urllib.request  # 发起 HTTP 请求
 from waku.tools.registry import Tool  # 工具定义类
 
 _UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"  # 伪装浏览器 UA，降低被 DDG 拦截的概率
-
 
 def _tavily(query: str, key: str, max_results: int) -> list[tuple[str, str, str]]:
     """Tavily 后端：结构化 API，返回 (标题, 摘要, URL) 元组列表。"""

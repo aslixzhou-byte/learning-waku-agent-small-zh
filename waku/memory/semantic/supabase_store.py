@@ -1,39 +1,27 @@
-"""语义记忆，向量版 —— Supabase pgvector 升级路径。
+"""语义记忆，向量版 Supabase pgvector 升级路径。
 
-接口与 SqliteFactStore 相同，不同的是检索方式：用真正的 embedding 和余弦相似度
-替代关键词 BM25。使用与 launch-rag / launch-agentic-rag
-(github.com/ShenSeanChen/launch-agentic-rag) 完全相同的 schema 和 `match_chunks`
-RPC —— 如果你看过那些视频，这就是同一张表。先在全新项目上运行
-sql/init_supabase.sql，然后：
-
-    pip install 'waku-agent[supabase]'
-    WAKU_SEMANTIC_STORE=supabase  SUPABASE_URL=...  SUPABASE_SERVICE_KEY=...
-    OPENAI_API_KEY=...   # 仅用于 embedding（text-embedding-3-small，1536d）
-
-什么时候值得用它而不是 FTS5？当措辞与字面表达不一致时：
-"my business partner" 应该能找到 "Alex is my cofounder"。关键词做不到；
-向量可以。对几百条个人事实来说，两者都是瞬间完成。
+不做详细说明
 """
 
-from __future__ import annotations  # 让类型注解（如 Settings）在旧版 Python 里也能用
+from __future__ import annotations
 
-import os  # 读取 SUPABASE_URL / SERVICE_KEY / OPENAI_API_KEY 等环境变量
-import uuid  # 生成唯一的 chunk_id（幂等 upsert 的键）
+import os
+import uuid
 
-from waku.config import Settings  # 配置：读取检索 top_k
+from waku.config import Settings
 
 
 class SupabaseFactStore:
     def __init__(self, settings: Settings):
-        import openai  # 延迟导入：openai 与 supabase 都放在 [supabase] extra 里，默认不装
+        import openai
         from supabase import create_client
 
-        self.supabase = create_client(  # 用服务端密钥连接（可读可写，绕过 RLS）
+        self.supabase = create_client(
             os.environ["SUPABASE_URL"], os.environ["SUPABASE_SERVICE_KEY"]
         )
-        self.openai = openai.OpenAI()  # 构造客户端，自动读取 OPENAI_API_KEY
-        self.embed_model = os.getenv("OPENAI_EMBED_MODEL", "text-embedding-3-small")  # 默认官方 1536 维 embedding 模型
-        self.top_k = settings.retrieval_top_k  # 检索条数跟随全局配置
+        self.openai = openai.OpenAI()
+        self.embed_model = os.getenv("OPENAI_EMBED_MODEL", "text-embedding-3-small")
+        self.top_k = settings.retrieval_top_k
 
     def _embed(self, text: str) -> list[float]:
         # input 必须传列表，结果里取第 0 个向量的 embedding（1536 维浮点列表）

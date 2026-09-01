@@ -1,17 +1,5 @@
-"""模型接入 —— 八个 provider，一个循环，零框架。
-
-循环只说一种方言：Anthropic 的 Messages 形状（system/messages/tools 进，content blocks 出）。
-provider 以两种方式接入：
-
-  anthropic 线格式（原生）    → Anthropic、Kimi/Moonshot、GLM/Z.ai、MiniMax
-  openai 线格式（薄适配器）   → OpenAI、Google Gemini、DeepSeek、OpenRouter
-
-用 WAKU_PROVIDER=anthropic|openai|gemini|deepseek|minimax|kimi|glm|openrouter 选择，
-并在 .env 里设置该 provider 的 API key。如果下面的默认模型 id 过时了，用
-WAKU_MODEL / WAKU_SMALL_MODEL 覆盖 —— 它们只是字符串。这对 openrouter 最重要：
-它是一把 key 挡在几百个模型前面，所以 WAKU_MODEL=<vendor>/<model>（例如
-"google/gemini-3.5-flash"）能选你想要的任何一个 —— 而且下面它的默认值是 $0
-的 ":free" id，所以完全不花钱也能用（限流）。dashboard 的 Settings 标签页会列出实时目录。
+"""模型接入
+这里解决OpenAI与Anthropic输入与消息格式转换问题
 """
 
 from __future__ import annotations  # 让类型注解在旧版 Python 里也能用
@@ -29,10 +17,9 @@ print(obj.name)    # "Alex"
 print(obj.age)     # 25
 print(obj.city)    # "Hangzhou"
 """
+
 from types import SimpleNamespace  # 轻量命名空间：用来捏造"长得像 anthropic"的响应对象
-
 from waku.config import Settings  # 配置：providers 靠它选 provider 和填充默认模型
-
 
 @dataclass(frozen=True)  # frozen=True：字段不可变，PROVIDERS 常驻配置不许被误改
 class Provider:
@@ -56,7 +43,6 @@ class Provider:
         """[flagship, fast]，去重 —— 切换器的默认选项。"""
         pair = [self.flagship or self.model, self.fast or self.small_model]  # 钉住的旗舰/快速为空则回退到循环默认模型
         return list(dict.fromkeys(m for m in pair if m))  # dict.fromkeys 去重且保序；同时滤掉空串
-
 
 PROVIDERS: dict[str, Provider] = {  # 名字 → Provider 的目录，循环的模型世界全集
     "anthropic": Provider("anthropic", "ANTHROPIC_API_KEY", None,  # Anthropic 官方，anthropic 线格式
@@ -103,7 +89,6 @@ PROVIDERS: dict[str, Provider] = {  # 名字 → Provider 的目录，循环的�
                           catalog_url="https://api.x.ai/v1/models"),
 }
 
-
 def get_client(settings: Settings):
     """为 settings.provider 构建客户端，并填入默认模型 id。
     返回任何带有 .messages.create(...)（Anthropic 形状）的东西。"""
@@ -146,16 +131,15 @@ def get_client(settings: Settings):
 
 
 class OpenAICompatClient:
-    """使用 Anthropic Messages 的请求格式（这是循环代码所期望的），
+    """使用 Anthropic Messages 的请求格式，
     但底层实际上调用的是 OpenAI 风格的 chat.completions API。
-    两种线格式之间的全部差异大约只有 60 行代码——值得读一遍。"
     """
 
     def __init__(self, api_key: str, base_url: str | None = None, timeout: float = 120.0):
-        import openai  # 延迟导入：不用 openai 线格式就不加载
+        import openai
 
         self._client = openai.OpenAI(api_key=api_key, base_url=base_url, timeout=timeout)
-        self.messages = SimpleNamespace(create=self._create, stream=self._stream)  # 伪装成 anthropic 的 messages 命名空间
+        self.messages = SimpleNamespace(create=self._create, stream=self._stream) # 伪装成 anthropic 的 messages 命名空间
 
     def _to_openai(self, *, model, messages, max_tokens, system=None, tools=None) -> dict:
         """把 Anthropic 形状的入参翻译成 OpenAI chat.completions 的参数。"""
@@ -196,7 +180,7 @@ class OpenAICompatClient:
         kwargs: dict = {"model": model, "messages": oai_messages,
                         "max_completion_tokens": max_tokens}
         if tools:
-            kwargs["tools"] = [  # 把 anthropic 形状的工具 schema 转成 OpenAI 的 tools 参数
+            kwargs["tools"] = [ # 把 anthropic 形状的工具 schema 转成 OpenAI 的 tools 参数
                 {"type": "function",
                  "function": {"name": t["name"], "description": t["description"],
                               "parameters": t["input_schema"]}}
@@ -211,17 +195,17 @@ class OpenAICompatClient:
         （例如某次 gpt-5.x 调用会因别的原因失败，然后 max_tokens 重试把它埋在
         一条令人困惑的 'use max_completion_tokens' 消息下面）。"""
         try:
-            return self._client.chat.completions.create(**kwargs, **extra)  # 先按新参数名尝试
+            return self._client.chat.completions.create(**kwargs, **extra) # 先按新参数名尝试
         except Exception as exc:
             m = str(exc).lower()
-            if "max_completion_tokens" not in m and "max_tokens" not in m:  # 报错与那个参数无关 → 原样抛出
+            if "max_completion_tokens" not in m and "max_tokens" not in m: # 报错与那个参数无关 → 原样抛出
                 raise
             k = dict(kwargs)
-            k["max_tokens"] = k.pop("max_completion_tokens", None)  # 只把参数名回退成旧的 max_tokens
+            k["max_tokens"] = k.pop("max_completion_tokens", None) # 只把参数名回退成旧的 max_tokens
             return self._client.chat.completions.create(**k, **extra)
 
     def _create(self, *, model, messages, max_tokens, system=None, tools=None):
-        """OpenAI 的 messages.create() 实现 —— 调用并翻译回 Anthropic 形状的响应。"""
+        """OpenAI 的 messages.create() 实现，调用并翻译回 Anthropic 形状的响应。"""
         response = self._call(self._to_openai(  # 先翻译成 OpenAI 参数再调用
             model=model, messages=messages, max_tokens=max_tokens, system=system, tools=tools))
         if not getattr(response, "choices", None):

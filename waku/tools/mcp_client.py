@@ -1,4 +1,6 @@
-"""MCP 连接器——把任何 Model Context Protocol 服务器接入 Waku 的工具。
+"""MCP 连接器
+
+把任何 Model Context Protocol 服务器接入 Waku 的工具。
 
 Waku 的循环是同步的；MCP SDK 是异步的。下面的桥接器在一个守护线程上
 运行一个 asyncio 事件循环，通过单个 AsyncExitStack 在该循环上持有每个
@@ -27,7 +29,6 @@ from waku.tools.registry import Tool  # 工具定义类
 
 class MCPBridge:
     """桥：在后台线程的 asyncio 循环里持有 MCP 会话，对外暴露同步的 Tool 调用入口。"""
-
     def __init__(self, config_path: Path, timeout: float = 30.0):
         self.config_path = config_path  # mcp.json 路径
         self.timeout = timeout  # 单次工具调用 / 连接的等待秒数

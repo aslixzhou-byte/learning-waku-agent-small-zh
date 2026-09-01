@@ -1,15 +1,8 @@
 """基于 Notion 数据库的情景记忆适配器。
-
-每个 episode 变成数据库中的一页，包含两个属性：
-- Name（标题）：ISO-8601 时间戳字符串（happened_at）
-- Summary（富文本）：episode 摘要
-
-通过 [notion] extra 安装（notion-client >= 2.5，data-sources API）：
-    pip install 'waku-agent[notion]'
-
 设置环境变量：
     NOTION_TOKEN=<集成令牌>
     NOTION_EPISODES_DATABASE_ID=<数据库 id>
+不做详细说明
 """
 
 from __future__ import annotations  # 让类型注解（如 str | None）在旧版 Python 里也能用
@@ -21,16 +14,13 @@ from urllib.parse import urlparse  # 解析链接，判断它是裸 ID 还是完
 
 def normalize_database_id(value: str) -> str:
     """接受一个 Notion 数据库 ID，或一个复制来的数据库 URL。
-
     Notion 把数据库对象 ID 放在 URL 路径中，把视图 ID 放在 ``v`` 查询参数中。
     把这段转换放在这里，让每个入口都能接受用户从 Notion 自然复制的链接。
     """
-    value = value.strip()  # 去掉首尾空白（浏览器复制时常带换行/空格）
-    parsed = urlparse(value)  # 按 URL 解析；不是链接时 scheme/netloc 都为空
-    if parsed.scheme and parsed.netloc:  # 看起来是个完整链接
+    value = value.strip()
+    parsed = urlparse(value)
+    if parsed.scheme and parsed.netloc:
         match = re.search(r"(?<![0-9a-f])[0-9a-f]{32}(?![0-9a-f])", parsed.path.lower())
-        # 在路径里找 32 位十六进制数据库 ID；(?<!..) 和 (?!..) 是负向断言，
-        # 防止从更长的十六进制串里误截一段
         if not match:
             raise ValueError("Notion database link must include a database ID in its path")
         return match.group(0)  # 只返回裸的数据库 ID
@@ -39,14 +29,12 @@ def normalize_database_id(value: str) -> str:
 
 class NotionEpisodeStore:
     def __init__(self, token: str | None = None, database_id: str | None = None) -> None:
-        from notion_client import Client  # 延迟导入：notion-client 在 [notion] extra 里
-
-        self.token = token or os.environ.get("NOTION_TOKEN")  # 显式参数优先，否则读环境变量
+        from notion_client import Client
+        self.token = token or os.environ.get("NOTION_TOKEN")
         raw_database_id = database_id or os.environ.get("NOTION_EPISODES_DATABASE_ID", "")
         self.database_id = normalize_database_id(raw_database_id) if raw_database_id else ""
-        # 接受裸 ID 或完整 URL，统一归一化成裸 ID
         if not self.token:
-            raise ValueError(  # 缺令牌立刻报错，而不是等运行时才失败
+            raise ValueError(
                 "Notion token required: pass token= or set NOTION_TOKEN environment variable"
             )
         if not self.database_id:

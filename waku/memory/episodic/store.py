@@ -1,8 +1,7 @@
-"""情景记忆 —— 带日期的事件：发生了什么，以及何时发生。
-
+"""情景记忆：带日期的事件：发生了什么，以及何时发生。
 语义记忆回答"我知道什么？"；情景记忆回答"上周二发生了什么？"。
 用的是同一个 SQLite 文件，但每一行都带日期，检索把相关性（FTS 排名）与
-时效性结合起来 —— 即白板上的"相关性用 RAG + 时效性用 SQL"。
+时效性结合起来。
 """
 
 from __future__ import annotations  # 让类型注解（如 sqlite3.Connection）在旧版 Python 里也能用
@@ -21,10 +20,12 @@ class SqliteEpisodeStore:
             "INSERT INTO episodes (happened_at, summary) VALUES (?,?)",
             (happened_at, summary),
         )
+        print("插入带日期的情景摘要：summary={}, happened_at={}".format(summary, happened_at))
         self.conn.commit()  # 立即落库
 
     def search(self, query: str, top_k: int = 3) -> list[str]:
         """相关性优先（FTS），匹配结果中最新在前。"""
+        print("SqliteEpisodeStore.search 情景记忆 top_k=3 query=".format(query))
         fts = _fts_query(query)  # 把用户文本转成合法 FTS5 查询
         if not fts:
             return self.recent(top_k)  # 空查询回退到最近事件，而非报错

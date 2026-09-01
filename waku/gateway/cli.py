@@ -1,20 +1,15 @@
-"""CLI 网关 —— 与你的 Waku 对话的零配置方式。
-
+"""CLI 网关
 网关接口盒子：网关只负责文本的进与出；所有有趣的事情都发生在循环里。
-Telegram 网关是同样约 60 行代码，只是用轮询代替 input()。
 """
 
-from __future__ import annotations  # 让类型注解（如 sqlite3.Connection）在旧版 Python 里也能用
+from __future__ import annotations
+import sqlite3
+from rich.console import Console
+from rich.panel import Panel
+from rich.text import Text
+from waku.app import Waku
 
-import sqlite3  # 直接读状态库（.waku/state.db），做记忆快照查询
-
-from rich.console import Console  # Rich：在终端渲染彩色/带样式文本
-from rich.panel import Panel      # 带边框的卡片容器，用于包住记忆快照
-from rich.text import Text        # 支持样式的文本对象（Panel 内展示需要它）
-
-from waku.app import Waku  # 核心应用入口：会话、循环、记忆都经它
-
-console = Console()  # 全局富文本控制台，供所有打印复用
+console = Console() # 全局富文本控制台，供所有打印复用
 
 
 def _memory_snapshot(conn: sqlite3.Connection) -> str:
@@ -42,7 +37,7 @@ def _memory_snapshot(conn: sqlite3.Connection) -> str:
 
 
 def _observer(kind: str, event: dict) -> None:
-    """实时展示循环的内部——视频里'透明框架'的那段。"""
+    """实时展示循环的内部"""
     if kind == "tool":  # 工具调用事件
         console.print(f"  [dim]tool · {event['tool']}({event['args']}) → {event['output'][:80]}[/dim]")  # 输出截断到 80 字符，避免刷屏
     elif kind == "gate":  # 检索门控决策事件
@@ -60,7 +55,7 @@ def main() -> None:
         "Commands: /memory · /quit",
         border_style="cyan",
     ))
-    while True:  # 主事件循环：阻塞等输入，处理完再回来
+    while True: # 主事件循环：阻塞等输入，处理完再回来
         try:
             user_message = console.input("[bold cyan]you ›[/bold cyan] ").strip()  # 读一行输入并去掉首尾空白
         except (EOFError, KeyboardInterrupt):  # Ctrl-D / Ctrl-C：优雅退出
@@ -84,4 +79,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()  # 仅当直接运行该文件（而非被 import）时才启动
+    main() # 仅当直接运行该文件（而非被 import）时才启动

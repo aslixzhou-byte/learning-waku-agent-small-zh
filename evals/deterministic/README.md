@@ -43,7 +43,7 @@ uv run python -m pytest -q evals/deterministic/test_wake_word.py
 | [`test_cli_memory.py`](test_cli_memory.py) | CLI `/memory` 读本地 SQLite 快照 |
 | [`test_episodic_store_switch.py`](test_episodic_store_switch.py) | sqlite \| notion 情景存储切换、缓存、宕机降级 |
 | [`test_notion_episodes.py`](test_notion_episodes.py) | NotionEpisodeStore：增删查、database id 规范化（mock） |
-| [`test_compare_history.py`](test_compare_history.py) | Compare 竞技场独立 JSONL：append / clear / 聚合（不写 state.db） |
+| [`test_compare_history.py`](test_compare_history.py) | Compare独立 JSONL：append / clear / 聚合（不写 state.db） |
 | [`test_all_history.py`](test_all_history.py) | Dashboard「All messages」跨线程时间线 |
 | [`test_session_resume.py`](test_session_resume.py) | Dashboard 恢复最近活跃线程（仅 dashboard 来源） |
 | [`test_session_rotation.py`](test_session_rotation.py) | 空闲线程轮换；切 provider 清掉陈旧 model override |

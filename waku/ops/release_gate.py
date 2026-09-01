@@ -1,24 +1,24 @@
-"""发布门禁——白板上「Release」之前的那颗菱形。
-
-改过提示词？换过模型？调过检索的 top-k？跑一下门禁：
-
-    python -m waku.ops.release_gate     （或：make gate）
-
-确定性评测必须 100% 通过——它们就是单元测试；任一失败即阻止发布。
+"""
+发布门禁
+python -m waku.ops.release_gate
+确定性评测必须 100% 通过，它们就是单元测试；任一失败即阻止发布。
 当存在密钥时运行裁判评测，并汇报分数。退出码 0 = 可以发布。
+
+1. evals/deterministic
+2. evals/judge
 """
 
 from __future__ import annotations
 
-import os            # 判断密钥环境变量是否存在
-import re            # 从 pytest 摘要里解析数字
-import subprocess    # 启动 pytest 子进程
-import sys           # 复用当前解释器来跑 pytest
+import os
+import re
+import subprocess # 启动 pytest 子进程
+import sys # 复用当前解释器来跑 pytest
 from pathlib import Path
 
 from dotenv import load_dotenv
 
-load_dotenv()  # 下面的密钥检查必须能看到 .env，和 app 的行为一致
+load_dotenv()
 
 REPO = Path(__file__).resolve().parents[2]   # 仓库根目录（evals 所在处）
 

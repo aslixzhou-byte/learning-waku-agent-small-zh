@@ -1,10 +1,7 @@
-"""程序性记忆 —— SKILL.md 文件：如何行动，只在相关时加载。
-
+"""程序性记忆 SKILL.md 文件：如何行动，只在相关时加载。
 官方 Anthropic Agent Skills 格式：带 `name` 和 `description` 的 YAML frontmatter
-（description 兼任触发器 —— 没有自定义 `triggers:` 字段，那是规范定型前
-launch-agent-skills 用的）。
 
-渐进式披露，这才是关键：
+渐进式披露：
   1. 每个 skill 的 frontmatter 始终被扫描（开销小）
   2. 只有当 skill 与消息匹配时，其正文才被加载进提示词
   3. skill 引用的文件只在模型提出请求时才读取
@@ -45,9 +42,11 @@ def _parse(path: Path) -> Skill | None:
 
 
 class SkillLoader:
-    """扫描 skill 目录：仓库的 skills/（内置 + 社区）以及 WAKU_HOME/skills
-    （已安装或由代理自己编写）。任何 SKILL.md 发生变化时自动重新扫描，
-    因此会话中途创建的 skill 会在下一轮生效。"""
+    """
+    扫描 skill 目录：仓库的 skills/（内置 + 社区）以及 WAKU_HOME/skills
+    任何 SKILL.md 发生变化时自动重新扫描，
+    因此会话中途创建的 skill 会在下一轮生效。
+    """
 
     def __init__(self, dirs: list[Path]):
         self.dirs = dirs  # 要扫描的目录列表
@@ -76,8 +75,8 @@ class SkillLoader:
 
     def match(self, message: str, max_skills: int = 2) -> list[Skill]:
         """透明触发器：消息与每个 skill 的 name+description 之间的关键词重叠。
-        没有 embedding，没有魔法 —— 你可以在心里算出得分。"""
-        if self._scan_sig() != self._sig:   # 有 skill 被新增/编辑 —— 重新加载
+        没有 embedding，没有魔法 你可以在心里算出得分。"""
+        if self._scan_sig() != self._sig:   # 有 skill 被新增/编辑 重新加载
             self.refresh()
         msg_words = set(re.findall(r"[a-z0-9]{3,}", message.lower()))  # 消息分词成集合
         scored = []

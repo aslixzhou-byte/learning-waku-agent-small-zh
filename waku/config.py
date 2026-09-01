@@ -1,6 +1,4 @@
-"""配置 —— 每个开关都是一个环境变量，已在 .env.example 中说明。
-
-没有配置框架：一个 dataclass，在启动时读取一次。能读懂这个文件，你就知道 Waku 可配置的全部能力。
+"""配置文件
 """
 
 from __future__ import annotations  # 让类型注解（如 Path | None）在旧版 Python 里也能用
@@ -11,8 +9,7 @@ from pathlib import Path               # 跨平台路径对象（home 目录等�
 
 from dotenv import load_dotenv  # 从 .env 文件加载环境变量（可选依赖）
 
-load_dotenv()  # 读取当前目录下的 .env（若存在）
-
+load_dotenv()
 
 @dataclass
 class Settings:
@@ -64,7 +61,7 @@ class Settings:
         default_factory=lambda: os.getenv("WAKU_APPLE_TOOLS", "") in ("1", "true", "yes")
     )  # 显式开启才暴露苹果套件工具（默认关）
     # 注册实验性工具（delegate_task -> pi 子 agent 等）。环境变量是全局开关；
-    # 竞技场按单场比赛设置它，让编码赛能把活交给 pi 而无需为整个进程打开它。
+    # Compare按单场比赛设置它，让编码赛能把活交给 pi 而无需为整个进程打开它。
     experimental: bool = field(
         default_factory=lambda: os.getenv("WAKU_EXPERIMENTAL", "") in ("1", "true", "yes")
     )  # 实验性工具开关（默认关）
@@ -82,8 +79,10 @@ class Settings:
         self.home.mkdir(parents=True, exist_ok=True)  # 建 home 本身（.waku/），可多级
         (self.home / "traces").mkdir(exist_ok=True)   # 建追踪目录（JSONL 输出落这里）
         (self.home / "outbox").mkdir(exist_ok=True)   # 建发件箱（send_message 草稿落这里）
+        print(f"ensure_home(self): 目录为{str(self.home)}")
         return self.home
 
 
 def load_settings() -> Settings:
+    print("load_settings() return Settings")
     return Settings()  # 启动时读一次环境变量，拼出全部配置；没有额外逻辑

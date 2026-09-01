@@ -1,5 +1,4 @@
-"""记忆门面 —— 三大支柱背后的小接口。
-
+"""
     procedural  SKILL.md 文件      如何行动
     semantic    facts 表 (FTS5)   什么是持久的真相
     episodic    episodes 表       发生了什么、何时发生
@@ -9,12 +8,10 @@
     consolidation    每 N 次交互把对话蒸馏成事实
 """
 
-from __future__ import annotations  # 让类型注解（如 sqlite3.Connection）在旧版 Python 里也能用
-
-import sqlite3  # SQLite：三大记忆共用的本地文件（state.db）
-from pathlib import Path  # 跨平台的文件路径操作
-
-import anthropic  # Anthropic SDK：门禁/整合都要调用的小模型
+from __future__ import annotations
+import sqlite3
+from pathlib import Path
+import anthropic
 
 from waku.config import Settings  # 配置对象：store 开关、模型名、top_k 等
 from waku.memory import consolidation, retrieval_gate  # 引入两个管理代理：整合 + 门禁
@@ -29,9 +26,7 @@ REPO_SKILLS = Path(__file__).resolve().parents[2] / "skills"
 class Memory:
     def __init__(self, conn: sqlite3.Connection, settings: Settings, client: anthropic.Anthropic,
                  episode_store=None):
-        # episode_store：注入一个已构建好的存储（dashboard 在进程级缓存了唯一一个
-        # NotionEpisodeStore —— 其构造函数会访问网络，所以每个 Memory 各建一个
-        # 会导致每次轮询都重新查询 Notion）。
+        # episode_store：注入一个已构建好的存储
         self.conn = conn  # 共享的 SQLite 连接（facts/episodes/chat_log 都在这里）
         self.settings = settings  # 配置：store 选择、小模型名、top_k 等
         self.client = client  # Anthropic 客户端：门禁/整合都要用
@@ -59,26 +54,38 @@ class Memory:
     # ---- 检索（带门禁 —— 原因见 retrieval_gate.py）
     def gated_retrieve(self, message: str, notify=None) -> str:
         # 先让便宜的小模型决定：这条消息需要记忆吗？（避免无关记忆干扰答案）
+        print("gated_retrieve(self, message: str, notify=None) 小模型判断消息：{} 是否需要记忆检索".format(message))
         retrieve, query, reason = retrieval_gate.should_retrieve(
             self.client, self.settings.small_model, message
         )
+        print(f"gated_retrieve: 门禁记忆检索结果：{retrieve}, {query}, {reason}")
         if notify:  # dashboard 等观察者想看到门禁的裁决
+            print("gate:: decision: {} reason: {}".format("retrieve" if retrieve else "skip", reason))
             notify("gate", {"decision": "retrieve" if retrieve else "skip", "reason": reason})
         if not retrieve:
+            print("gate not retrieve")
             return ""  # 门禁说不检索：直接返回空，不触碰任何存储
         found = self.facts.search(query, self.settings.retrieval_top_k)  # 语义记忆：FTS5 关键词 top-k
+        print("gate found 语义记忆: {}".format(found))
         found += self.episodes.search(query, top_k=3)  # 情景记忆：相关事件（固定取 3 条）
+        print("gate found 语义记忆 + 情景记忆: {}".format(found))
+        print("gate need retrieve | 获取语义记忆 获取情景记忆 组织提示词: ".format("\n".join(found)))
         return "\n".join(found)  # 拼成一段文本，供后续注入提示词
 
     # ---- 程序性记忆
     def matching_skills(self, message: str) -> str:
+        print("根据输入查找skill: matching_skills")
         matched = self.skills.match(message)  # 关键词重叠匹配，只挑相关的 skill
+        print("\n\n".join(f"### {s.name}\n{s.body}" for s in matched))
         return "\n\n".join(f"### {s.name}\n{s.body}" for s in matched)  # 以 markdown 标题 + 正文拼进提示词
 
     # ---- 写入路径
     def log_chat(self, user_message: str, reply: str, session_id: str = "default",
                  source: str = "cli", meta: dict | None = None) -> None:
         import json as _json  # 局部导入：只有需要序列化 meta 时才用到
+        meta_json = _json.dumps(meta) if meta else None
+        print(f"user: {user_message} | assistant: {reply} | meta: {meta_json}")
+
         self.conn.execute(
             "INSERT INTO chat_log (role, content, session_id, source) VALUES ('user', ?, ?, ?)",
             (user_message, session_id, source),
@@ -134,7 +141,10 @@ class Memory:
         return out
 
     def export_markdown(self) -> None:
-        """把记忆镜像到 state.db 旁边的人类可读 MEMORY.md —— 这样白板上的
+
+        print("保持MEMORY.md文件同步: memory.export_markdown")
+
+        """把记忆镜像到 state.db 旁边的人类可读 MEMORY.md 这样白板上的
         `~/.waku/MEMORY.md` 盒子就真实存在，"你的记忆是一个能打开的文件" 这句话
         也成真。state.db 仍是可查询的事实源；此文件是每次轮询后重新生成的视图。"""
         facts = self.conn.execute(  # 语义记忆：事实列表（按主题聚合成组，便于人读）
@@ -170,4 +180,5 @@ class Memory:
             self.episodes,
         )
         if new_facts and notify:  # 真有新事实时通知观察者（dashboard 据此展示"记忆已更新"）
+            print("maybe_consolidate: 记忆已更新 notify","consolidation", {"new_facts": new_facts})
             notify("consolidation", {"new_facts": new_facts})

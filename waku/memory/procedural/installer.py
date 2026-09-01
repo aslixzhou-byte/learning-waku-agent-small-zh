@@ -1,35 +1,30 @@
-"""Skill 安装器 —— 一条命令就能尝试安装任意人的 skill。
-
+"""Skill 安装器 一条命令就能尝试安装任意人的 skill。
     python -m waku skill install https://github.com/<user>/<repo>/blob/main/skills/foo/SKILL.md
     python -m waku skill install https://gist.github.com/<user>/<id>
-
 下载 SKILL.md，校验 frontmatter（与 CI 对社区 PR 执行的检查相同），
 并放入 WAKU_HOME/skills/<name>/，加载器会在下次启动时拾取它。
-Skill 就是 markdown —— 安装前请阅读你装的内容。
 """
 
-from __future__ import annotations  # 让类型注解在旧版 Python 里也能用
-
-import urllib.request  # 标准库 HTTP 下载（不引入第三方依赖）
-
-from waku.config import load_settings  # 读取 WAKU_HOME 等配置
-from waku.memory.procedural.loader import _parse  # 复用加载器的 frontmatter 校验
+from __future__ import annotations
+import urllib.request
+from waku.config import load_settings
+from waku.memory.procedural.loader import _parse
 
 
 def _raw_url(url: str) -> str:
     """把常见的 GitHub/Gist 页面 URL 转换为原始内容 URL。"""
-    if "github.com" in url and "/blob/" in url:  # GitHub blob 页面 → raw.githubusercontent 直链
+    if "github.com" in url and "/blob/" in url:
         return url.replace("github.com", "raw.githubusercontent.com").replace("/blob/", "/")
-    if "gist.github.com" in url and not url.endswith("/raw"):  # Gist 页面 → 末尾补 /raw 变直链
+    if "gist.github.com" in url and not url.endswith("/raw"):
         return url.rstrip("/") + "/raw"
-    return url  # 已经是可下载的 URL（或以 /raw 结尾）就原样返回
+    return url
 
 
 def install(url: str) -> None:
     raw = _raw_url(url)
-    print(f"Fetching {raw}")  # 先打印目标地址，让用户清楚在下载什么
-    with urllib.request.urlopen(raw, timeout=15) as response:  # noqa: S310 — 用户提供的 URL，属设计使然
-        text = response.read().decode("utf-8", errors="replace")  # 读到字节后按 UTF-8 解码，坏字节用 � 替换
+    print(f"Fetching {raw}")
+    with urllib.request.urlopen(raw, timeout=15) as response:
+        text = response.read().decode("utf-8", errors="replace")
 
     settings = load_settings()
     settings.ensure_home()  # 确保 WAKU_HOME 目录存在

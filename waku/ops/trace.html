@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent Trace 瀑布</title>
+<style>
+  :root {
+    --gate: #f59e0b;
+    --llm: #3b82f6;
+    --tool: #10b981;
+    --consolidation: #8b5cf6;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; margin: 0; background: #f5f6f8; color: #1a1a1a; }
+  header { background: #fff; border-bottom: 1px solid #e5e7eb; padding: 14px 20px; display: flex; align-items: center; gap: 16px; position: sticky; top: 0; z-index: 10; }
+  header h1 { font-size: 1.1rem; margin: 0; }
+  header select { padding: 6px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; }
+  main { max-width: 1000px; margin: 24px auto; padding: 0 16px; }
+  .turn { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; margin-bottom: 20px; overflow: hidden; }
+  .turn-head { padding: 12px 16px; border-bottom: 1px solid #f0f1f3; }
+  .turn-head .msg { font-weight: 600; font-size: 0.95rem; }
+  .turn-head .meta { font-size: 0.78rem; color: #6b7280; margin-top: 3px; }
+  .timeline { padding: 14px 16px 20px; }
+  .row { display: flex; align-items: center; gap: 10px; margin-bottom: 7px; }
+  .row .label { flex: 0 0 150px; display: flex; align-items: center; gap: 6px; font-size: 0.8rem; color: #374151; }
+  .row .dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+  .bar-area { flex: 1; position: relative; height: 20px; background: #f9fafb; border-radius: 4px; }
+  .bar { position: absolute; top: 3px; height: 14px; border-radius: 3px; min-width: 2px; cursor: pointer; }
+  .row .dur { flex: 0 0 74px; text-align: right; font-size: 0.76rem; color: #6b7280; font-variant-numeric: tabular-nums; }
+  .ruler { display: flex; justify-content: space-between; font-size: 0.7rem; color: #9ca3af; margin-top: 4px; }
+  .tooltip { position: fixed; background: #111827; color: #f9fafb; padding: 8px 10px; border-radius: 6px; font-size: 0.78rem; max-width: 360px; pointer-events: none; z-index: 100; display: none; line-height: 1.5; white-space: pre-wrap; }
+  .legend { display: flex; gap: 16px; font-size: 0.78rem; color: #4b5563; margin: 4px 2px 16px; }
+  .legend span { display: flex; align-items: center; gap: 5px; }
+  .legend .dot { width: 9px; height: 9px; border-radius: 50%; }
+  .reply { margin-top: 12px; padding: 10px 12px; background: #f9fafb; border-radius: 8px; font-size: 0.82rem; color: #374151; white-space: pre-wrap; max-height: 120px; overflow: auto; }
+  .empty { text-align: center; color: #9ca3af; padding: 60px 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Agent Trace 瀑布</h1>
+  <select id="file" onchange="load()"></select>
+</header>
+<main id="main"></main>
+<div class="tooltip" id="tip"></div>
+
+<script>
+const COLORS = { gate: 'var(--gate)', llm: 'var(--llm)', tool: 'var(--tool)', consolidation: 'var(--consolidation)' };
+const LABELS = { gate: '门禁 gate', llm: 'LLM 调用', tool: '工具调用', consolidation: '记忆整合' };
+
+async function load() {
+  try {
+    const date = document.getElementById('file').value;
+    const res = await fetch(date ? '/api/trace?date=' + date : '/api/trace');
+    const data = await res.json();
+    const sel = document.getElementById('file');
+    if (sel.options.length === 0) {
+      (data.files || []).forEach(f => {
+        const o = document.createElement('option');
+        o.value = f.date; o.textContent = f.name;
+        sel.appendChild(o);
+      });
+    }
+    render(data.turns, data.raw_events);
+  } catch (e) {
+    document.getElementById('main').innerHTML = '<div class="empty">加载失败：' + e.message + '</div>';
+  }
+}
+
+function render(turns, rawEvents) {
+  const main = document.getElementById('main');
+  main.innerHTML = '';
+  if (!turns.length) {
+    main.innerHTML = '<div class="empty">没有 trace 数据。先跑几轮对话（或发消息给 Waku）。</div>';
+    return;
+  }
+  main.innerHTML =
+    '<div class="legend">' +
+    '<span><i class="dot" style="background:var(--gate)"></i>门禁</span>' +
+    '<span><i class="dot" style="background:var(--llm)"></i>LLM</span>' +
+    '<span><i class="dot" style="background:var(--tool)"></i>工具</span>' +
+    '<span><i class="dot" style="background:var(--consolidation)"></i>整合</span>' +
+    '</div>';
+
+  turns.forEach(t => main.appendChild(turnCard(t)));
+  if (rawEvents) main.appendChild(rawSection(rawEvents));
+}
+
+function rawSection(events) {
+  const section = document.createElement('div');
+  section.style.marginTop = '32px';
+  const h = document.createElement('h2');
+  h.textContent = '原始数据（' + events.length + ' 条）';
+  h.style.cssText = 'font-size:1rem;margin:0 0 12px;';
+  section.appendChild(h);
+  events.forEach((ev, i) => section.appendChild(rawRow(ev, i)));
+  return section;
+}
+
+function rawRow(ev, i) {
+  const details = document.createElement('details');
+  details.style.cssText = 'background:#fff;border:1px solid #e5e7eb;border-radius:8px;margin-bottom:6px;padding:8px 12px;';
+  const summary = document.createElement('summary');
+  summary.style.cssText = 'cursor:pointer;font-size:0.8rem;color:#374151;font-family:ui-monospace,SFMono-Regular,monospace;';
+  summary.textContent = '#' + (i + 1) + ' [' + ev.type + '] ' + ev.ts;
+  details.appendChild(summary);
+  const pre = document.createElement('pre');
+  pre.style.cssText = 'font-size:0.76rem;color:#374151;white-space:pre-wrap;word-break:break-all;margin:8px 0 0;';
+  pre.textContent = JSON.stringify(ev, null, 2);
+  details.appendChild(pre);
+  return details;
+}
+
+function turnCard(t) {
+  const div = document.createElement('div');
+  div.className = 'turn';
+  const total = t.total_ms;
+  const max = total > 0 ? total : 1;
+
+  div.innerHTML = `
+    <div class="turn-head">
+      <div class="msg">${esc(t.user_message)}</div>
+      <div class="meta">${t.provider ? t.provider + ':' + t.model + ' · ' : ''}总耗时 ${t.total_ms}ms · ${t.iterations} 轮</div>
+    </div>
+    <div class="timeline">
+      ${t.events.map(ev => rowHtml(ev, max, total)).join('')}
+      <div class="ruler"><span>0ms</span><span>${Math.round(total / 2)}ms</span><span>${total}ms</span></div>
+      ${t.reply ? '<div class="reply">' + esc(t.reply) + '</div>' : ''}
+    </div>`;
+  return div;
+}
+
+function rowHtml(ev, max, total) {
+  const c = COLORS[ev.type] || '#9ca3af';
+  const label = LABELS[ev.type] || ev.type;
+  const left = (ev.offset_ms / max * 100).toFixed(2);
+  const width = Math.max((ev.dur_ms / max * 100), 0.6).toFixed(2);
+  return `
+    <div class="row">
+      <div class="label"><span class="dot" style="background:${c}"></span>${label}${ev.iteration ? ' #' + ev.iteration : ''}</div>
+      <div class="bar-area">
+        <div class="bar" style="left:${left}%; width:${width}%; background:${c}"
+             data-tip="${esc(tipText(ev))}"></div>
+      </div>
+      <div class="dur">${ev.dur_ms}ms</div>
+    </div>`;
+}
+
+function tipText(ev) {
+  const parts = [];
+  if (ev.type === 'gate') parts.push('决策: ' + ev.decision + (ev.reason ? ' — ' + ev.reason : ''));
+  if (ev.type === 'llm') parts.push('模型: ' + (ev.model || '') + '\nstop: ' + ev.stop_reason + '\nin ' + (ev.usage?.in || 0) + ' / out ' + (ev.usage?.out || 0));
+  if (ev.type === 'tool') parts.push('工具: ' + ev.tool + '\n参数: ' + JSON.stringify(ev.args) + '\n输出: ' + String(ev.output || '').slice(0, 120));
+  if (ev.type === 'consolidation') parts.push('新事实: ' + (ev.new_facts ?? 0));
+  return parts.join('\n') || JSON.stringify(ev);
+}
+
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+}
+
+// tooltip：事件条悬停显示详情
+document.addEventListener('mouseover', e => {
+  const bar = e.target.closest('.bar');
+  if (!bar) return;
+  const tip = document.getElementById('tip');
+  tip.textContent = bar.dataset.tip;
+  tip.style.display = 'block';
+});
+document.addEventListener('mousemove', e => {
+  const tip = document.getElementById('tip');
+  tip.style.left = (e.clientX + 14) + 'px';
+  tip.style.top = (e.clientY + 14) + 'px';
+});
+document.addEventListener('mouseout', e => {
+  if (e.target.closest('.bar')) document.getElementById('tip').style.display = 'none';
+});
+
+load();
+</script>
+</body>
+</html>

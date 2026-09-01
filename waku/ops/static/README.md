@@ -18,7 +18,7 @@
 | `render.js`  | 格式化器 + 聊天卡片渲染器（`stagesRow`/`teleFooter`）+ 聊天记录 + 流式 + `sendChat` |
 | `diagram.js` | `archSVG`（架构图）**以及**它的实时动画（`STAGE`/`hot`/`pollEvents`） |
 | `views.js`   | 子标签/db 辅助、SQL console、Memory/Tools 子视图、`VIEWS` 路由对象 |
-| `compare.js` | 模型竞技场（`Compare` 标签）——让一条消息同时穿过多个模型比赛 |
+| `compare.js` | Compare（`Compare` 标签）——让一条消息同时穿过多个模型比赛 |
 | `dock.js`    | 聊天会话/历史（`loadThreadInto`）、模型芯片、统计开关 |
 | `main.js`    | `render`/`refresh` 循环、resizers、语音，以及启动引导（**最后加载**） |
 

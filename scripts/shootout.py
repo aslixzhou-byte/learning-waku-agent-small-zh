@@ -1,4 +1,4 @@
-"""模型竞技场——相同的代理主体，不同的“大脑”，真实的账单。
+"""Compare——相同的代理主体，不同的“大脑”，真实的账单。
 
     python scripts/shootout.py kimi:kimi-k3 anthropic:claude-opus-4-8
     make shootout RUNS="kimi:kimi-k3 anthropic:claude-opus-4-8"
@@ -75,7 +75,7 @@ def run_one(provider: str, model: str, cases: list[dict], trials: int = 1) -> di
                 result = app.respond(case["input"])
                 ok, w = check_case(case, result.tool_calls)
                 iters_seen.append(result.iterations)
-            except Exception as exc:  # 崩溃的轮次算一次失败尝试，而不是让竞技场崩溃
+            except Exception as exc:  # 崩溃的轮次算一次失败尝试，而不是让Compare崩溃
                 ok, w = False, f"error: {str(exc)[:90]}"
             lat.append(time.perf_counter() - t0)
             i1, o1 = _ledger_totals(home)

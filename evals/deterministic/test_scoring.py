@@ -1,6 +1,6 @@
 """确定性评估——唯一的 Completion 评分器（waku.ops.scoring）。
 
-CLI 竞技场和实时竞技场都通过这个模块为运行评分，因此终端数字和屏幕上的数字
+CLI Compare和实时 Compare都通过这个模块为运行评分，因此终端数字和屏幕上的数字
 不会漂移。这些测试固化了契约：清单逻辑，以及把自由文本提示词匹配到对应用例。"""
 
 from __future__ import annotations

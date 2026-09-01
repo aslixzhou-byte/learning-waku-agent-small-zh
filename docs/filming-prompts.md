@@ -1,6 +1,6 @@
 # 拍摄提示词——复制粘贴清单
 
-上镜时在 Compare 竞技场跑的确切提示词。**逐字粘贴每一条**——竞技场按精确文本匹配来打 Completion 分（打错一个字 → 它照常比赛但 solved 显示 "—"）。打开 **"grade with K3"** 还能拿到 Quality 分。
+上镜时在 Compare跑的确切提示词。**逐字粘贴每一条**——Compare按精确文本匹配来打 Completion 分（打错一个字 → 它照常比赛但 solved 显示 "—"）。打开 **"grade with K3"** 还能拿到 Quality 分。
 
 完整基准组 + 预期结果：[benchmarks.md §3](benchmarks.md)。指标含义 + 算法：[benchmarks.md §10](benchmarks.md)。本文件只是提示词，按拍摄顺序排列。
 
@@ -45,7 +45,7 @@ Check my calendar for a free 30 minutes this afternoon and schedule a short walk
 ```
 Book a catch-up with Alex on Friday
 ```
-> 竞技场会自动预载事实"Alex prefers morning meetings"——好模型会应用它（约一个早上的时段）而不是忽略它。
+> Compare会自动预载事实"Alex prefers morning meetings"——好模型会应用它（约一个早上的时段）而不是忽略它。
 
 ## 第三幕——多工具展示
 
@@ -61,7 +61,7 @@ Search for the result of the Spain vs Argentina World Cup final, remember who wo
 
 滚动到 **Scoreboard**：成本-vs-质量**散点图**（便宜又好 = 左上角），然后按 **solved**、**K3 grade** 或 **total cost** 排序表格。
 
-## 第五幕——编码回合（终端，还不是竞技场）
+## 第五幕——编码回合（终端，还不是Compare）
 
 ```bash
 make shootout-coding RUNS="kimi:kimi-k3 anthropic:claude-opus-4-8 gemini:gemini-3.5-flash"

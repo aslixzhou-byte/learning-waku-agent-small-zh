@@ -1,4 +1,4 @@
-"""K3 作为裁判的「对比竞技场」质量评分。
+"""K3 作为裁判的「Compare」质量评分。
 
 完成度（waku.ops.scoring）是确定性的——有没有触发正确的工具。质量则是另一半：
 *回答本身有多好*，覆盖了清单看不到的开放式部分。这里没有唯一正确答案，
@@ -8,7 +8,7 @@
 裁判必须是「没有参赛」的模型——否则它就是给自己打分，既不公平也不可信
 （你没法用 K3 当裁判来测 K3）。默认是 **gpt-5.6-sol**：一个很强的推理模型，
 碰巧在这里是个糟糕的*参赛者*（它在聊天端点无法调用工具），但却是很好的
-*裁判*（评分是纯文本，不需要工具）。可在竞技场里按场次切换，或用
+*裁判*（评分是纯文本，不需要工具）。可在Compare里按场次切换，或用
 WAKU_JUDGE_* 配置。任意模型提供方都行——Waku 的 OpenAI 兼容客户端暴露的
 `.messages.create` 形状与 anthropic 线相同，所以裁判与提供方无关。
 """
@@ -24,8 +24,8 @@ from waku.config import Settings, load_settings
 from waku.loop.models import get_client
 
 # 裁判的模型提供方 / 模型默认值，可用 WAKU_JUDGE_PROVIDER / WAKU_JUDGE_MODEL 覆盖。
-JUDGE_PROVIDER = os.getenv("WAKU_JUDGE_PROVIDER", "openai")
-JUDGE_MODEL = os.getenv("WAKU_JUDGE_MODEL", "gpt-5.6-sol")
+JUDGE_PROVIDER = os.getenv("WAKU_JUDGE_PROVIDER", "deepseek")
+JUDGE_MODEL = os.getenv("WAKU_JUDGE_MODEL", "deepseek-v4-pro")
 
 # 一场对比会同时给每一列打分——8 个裁判调用同时打到同一个端点，
 # 会有一些被 429 拒绝，那些列就会显示「—」。限制并发运行的裁判调用数
@@ -100,6 +100,7 @@ def judge_reply(task: str, reply: str, provider: str | None = None,
         return None
     try:
         text = "".join(b.text for b in resp.content if getattr(b, "type", "") == "text")
+        print("text:: -> {}".format(text))
         # 只取文本块；从第一个 { 到最后一个 } 截取 JSON 对象
         obj = json.loads(text[text.index("{"): text.rindex("}") + 1])
         score = max(0, min(10, int(obj["score"])))   # 把分数夹紧到 0-10
